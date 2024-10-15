@@ -1,0 +1,8 @@
+﻿{
+    "GroupMap" : {
+        "Admin"    : "p-Admin",
+        "Operator" : "p-Operator",
+        "Viewer"   : "p-Viewer"
+    },
+    "DefaultExpiery" : { "Months": 1, "Days" : 1 }
+}
