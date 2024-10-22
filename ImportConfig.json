@@ -1,8 +1,17 @@
 ﻿{
+    "BasePath" : "DC=l4,DC=dev,DC=p3ki,DC=com",
+    
+    "SubPathMap" : {
+        "CN=Users" : "CN=Group2",
+        "*" : "CH=Group1"
+    },
+
     "GroupMap" : {
         "Admin"    : "p-Admin",
         "Operator" : "p-Operator",
-        "Viewer"   : "p-Viewer"
+        "Viewer"   : "p-Viewer",
+        "*"        : "Managed"
     },
+
     "DefaultExpiery" : { "Months": 1, "Days" : 1 }
 }
