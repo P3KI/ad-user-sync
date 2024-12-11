@@ -8,8 +8,11 @@
         "CN=t-Viewers,CN=Users"        : "CN=p-Viewers",
         "*"                            : "CN=p-Managed"
     },
+    "RestrictedGroups" : ["CN=p-Administrators"],
 
     "PrefixAccountNames" : "p-",
 
-    "DefaultExpiration" : null
+    "DefaultExpiration" : {"Months" :  1, "Days" :  1},
+
+    "InteractiveActionsOutput" : "Pending.json"
 }

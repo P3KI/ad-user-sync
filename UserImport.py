@@ -7,7 +7,7 @@ import argparse
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from pywintypes import com_error
-import pywintypes
+import InteractiveImport
 
 parser = argparse.ArgumentParser(
                     prog='UserImport',
@@ -71,7 +71,6 @@ def map_groups(sub_paths):
     return ret
 
 ## Create a map for all specified sub-paths to local managed AD Groups.
-## Used by map_groups() but also be the main code to turn it into a list of all managed groups
 def make_group_map(group_map):
     ret = {}
     for sub_path in group_map.keys():
@@ -82,6 +81,21 @@ def make_group_map(group_map):
             error("Error: Failed to load group mapping from configuration. Do all specified groups exist in AD?")
             error("       Failed at mapping entry:", sub_path, ":", mapped)
             error("       Looking for group:", full_path(mapped))
+            error("      ", e)
+            exit(1)
+
+    return ret
+
+## Create a list of ADGroups from all specified sub-paths.
+def make_group_list(group_list):
+    ret = set()
+    for sub_path in group_list:
+        try:
+            ret.add(get_group(full_path(sub_path)))
+        except (com_error, pyadexceptions.win32Exception) as e:
+            error("Error: Failed to load restricted groups from configuration. Do all specified groups exist in AD?")
+            error("       Failed at group entry:", sub_path)
+            error("       Looking for group:", full_path(sub_path))
             error("      ", e)
             exit(1)
 
@@ -136,11 +150,12 @@ ATTRIBUTE_BLACKLIST = {
 with open(args.config) as cfg:
     CONFIG = json.load(cfg)
 
-BASE_PATH          = CONFIG["BasePath"]
-USER_CONTAINER     = get_user_container(CONFIG.get("ManagedUserPath", "CN=P3KI Managed"))
-GROUP_MAP          = make_group_map(CONFIG.get("GroupMap", []))
-
-DEFAULT_EXPIRATION = make_expiration_date(CONFIG.get("DefaultExpiration", "default"))
+BASE_PATH            = CONFIG["BasePath"]
+USER_CONTAINER       = get_user_container(CONFIG.get("ManagedUserPath", "CN=P3KI Managed"))
+GROUP_MAP            = make_group_map(CONFIG.get("GroupMap", []))
+RESTRICTED_GROUPS    = make_group_list(CONFIG.get("RestrictedGroups", []))
+DEFAULT_EXPIRATION   = make_expiration_date(CONFIG.get("DefaultExpiration", "default"))
+PENDING_ACTIONS_FILE = CONFIG.get("InteractiveActionsOutput", "Pending.json")
 
 print("Config:", CONFIG)
 
@@ -199,9 +214,15 @@ for user in USERS:
     else:
         u.set_expiration(DEFAULT_EXPIRATION)
 
+    # If the user should be enabled, but is disabled, add an interactive action for it. Do not enable automatically.
+    if u._ldap_adsi_obj.AccountDisabled and not user["disabled"]:
+        print("User", u, "not automatically enabled.")
+        InteractiveImport.add_action(InteractiveImport.UserEnableAction(u.dn))
 
     if user["disabled"]:
         u.disable()
+
+
 
     # Collect group membership
     # We can't set group membership for users, instead we have to set user members for groups
@@ -224,11 +245,21 @@ for group in group_members:
         group.remove_members(removed_members)
 
     if len(added_members) > 0:
-        print("Adding users to group '" + group.cn + "' :", added_members)
-        group.add_members(added_members)
+        if group in RESTRICTED_GROUPS:
+            for u in added_members:
+                print("User", u, "not automatically adding to restricted group :", group.cn)
+                InteractiveImport.add_action(InteractiveImport.UserJoinGroupAction(u.dn, group.dn))
+        else:
+            print("Adding users to group '" + group.cn + "' :", added_members)
+            group.add_members(added_members)
 
 
 removed_users = [u for u in old_users if u not in new_users]
 for u in removed_users:
     print("Disabling user:", u.cn, "(no longer in import list)")
     u.disable()
+
+if PENDING_ACTIONS_FILE is not None:
+    if InteractiveImport.any_actions():
+        print("Saving action requiring intervention to ", PENDING_ACTIONS_FILE)
+    InteractiveImport.save(PENDING_ACTIONS_FILE) #Save either way
