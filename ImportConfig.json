@@ -1,17 +1,15 @@
-﻿{
-    "BasePath" : "DC=l4,DC=dev,DC=p3ki,DC=com",
-    
-    "SubPathMap" : {
-        "CN=Users" : "CN=Group2",
-        "*" : "CH=Group1"
-    },
+{
+    "BasePath" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
+    "ManagedUserPath" : "CN=P3KI Managed",
 
     "GroupMap" : {
-        "Admin"    : "p-Admin",
-        "Operator" : "p-Operator",
-        "Viewer"   : "p-Viewer",
-        "*"        : "Managed"
+        "CN=t-Administrators,CN=Users" : "CN=p-Administrators",
+        "CN=t-Operators,CN=Users"      : "CN=p-Operators",
+        "CN=t-Viewers,CN=Users"        : "CN=p-Viewers",
+        "*"                            : "CN=p-Managed"
     },
 
-    "DefaultExpiery" : { "Months": 1, "Days" : 1 }
+    "PrefixAccountNames" : "p-",
+
+    "DefaultExpiration" : null
 }
