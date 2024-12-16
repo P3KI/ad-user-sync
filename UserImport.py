@@ -135,10 +135,19 @@ def find_user(parent : adcontainer.ADContainer, cn : str):
         dn = q.get_single_result()["distinguishedName"]
         return aduser.ADUser.from_dn(dn)
 
+def find_conflicting_user(domain :  adcontainer.ADContainer, accountName : str):
+    q = adquery.ADQuery()
+    q.execute_query(attributes=["distinguishedName"], where_clause="objectClass = 'user' AND sAMAccountName = '" + accountName + "'", base_dn=domain.dn)
+    if q.get_row_count() == 0:
+        return None
+    else:
+        dn = q.get_single_result()["distinguishedName"]
+        return aduser.ADUser.from_dn(dn)
 
 ## Attributes that can not be applied using ADUser.update_attributes() function, but require special handling
 ATTRIBUTE_BLACKLIST = {
     "cn"               , # Only used during user creation
+    "sAMAccountName"   , # Only set during user creation, not updated after wards
     "memberOf"         , # Special handling: "memberOf" attribute of users can not be written, must use "member" attribute of groups.
     "distinguishedName", # should not be exported in the first place, since it is domain specific
     "subPath"          , # Currently not used, not a valid AD attribute.
@@ -165,6 +174,8 @@ with open(args.input) as input:
 
 print("Users:", USERS)
 
+InteractiveImport.load_resolved(PENDING_ACTIONS_FILE)
+
 # Memberships in all managed groups are collected here.
 group_members = {k: [] for k in GROUP_MAP.values()}
 
@@ -181,8 +192,8 @@ for user in USERS:
     groups = map_groups(user["memberOf"])
 
     #Apply name prefixes, if configured
-    cn = map_name(user["cn"])
-    user["sAMAccountName"] = map_name(user["sAMAccountName"])
+    cn           = map_name(user["cn"])
+    account_name = map_name(user["sAMAccountName"])
 
     # Extract attribute values so they can be applied to the target domain.
     attributes = {k: v for k, v in user.items() if k not in ATTRIBUTE_BLACKLIST}
@@ -192,12 +203,18 @@ for user in USERS:
     if u is None:
         print("Creating user:", cn)
         try:
-            u = parent.create_user(cn, enable=False, optional_attributes=attributes)
+            u = parent.create_user(cn, enable=False, optional_attributes=(attributes | {"sAMAccountName" : account_name}))
         except (com_error, pyadexceptions.win32Exception) as e:
-            error("Error: Failed to create user '" + cn + "' with login name '" + attributes["sAMAccountName"] + "'")
-            error("       Does another use with this login name already exists?")
-            error("      ", e)
-            exit(3)
+            conflict_user = find_conflicting_user(parent.get_domain(), account_name)
+            if conflict_user:
+                print("Failed to create user '" + cn + "' due to account name already in use:", account_name)
+                InteractiveImport.add_action(InteractiveImport.UserResolveAccountNameConflict(cn, conflict_user.cn, account_name, attributes))
+                continue
+            else:
+                error("Error: Failed to create user '" + cn + "' with login name '" + attributes["sAMAccountName"] + "'")
+                error("       Does another use with this login name already exists?")
+                error("      ", e)
+                exit(3)
     else:
         print("Updating user:", u.cn)
         u.update_attributes(attributes)
@@ -261,5 +278,5 @@ for u in removed_users:
 
 if PENDING_ACTIONS_FILE is not None:
     if InteractiveImport.any_actions():
-        print("Saving action requiring intervention to ", PENDING_ACTIONS_FILE)
+        print("Saving action requiring intervention to", PENDING_ACTIONS_FILE)
     InteractiveImport.save(PENDING_ACTIONS_FILE) #Save either way
