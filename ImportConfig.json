@@ -3,10 +3,10 @@
     "ManagedUserPath" : "CN=P3KI Managed",
 
     "GroupMap" : {
-        "CN=t-Administrators,CN=Users" : "CN=p-Administrators",
-        "CN=t-Operators,CN=Users"      : "CN=p-Operators",
-        "CN=t-Viewers,CN=Users"        : "CN=p-Viewers",
-        "*"                            : "CN=p-Managed"
+         "CN=t-Administrators" : "CN=p-Administrators",
+        "CN=t-Operators"      : "CN=p-Operators",
+        "CN=t-Viewers"        : "CN=p-Viewers",
+        "*"                   : "CN=p-Managed"
     },
     "RestrictedGroups" : ["CN=p-Administrators"],
 

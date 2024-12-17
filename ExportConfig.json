@@ -1,22 +1,17 @@
 {
-    "BasePath" : "DC=l4,DC=dev,DC=p3ki,DC=com",
-    "SearchSubPaths" : ["CN=Users"],
+    "BasePath" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
+    "SearchSubPaths" : [""],
 
-    "SearchGroups" : ["CN=Transfer,CN=Users","CN=Test,CN=Users"],
+    "SearchGroups" : ["CN=Transfer","CN=Test"],
 
     "Attributes":[
-              "sAMAccountName",
-              "cn",
               "displayName",
-              "disabled",
               "givenName",
               "sn",
               "mail",
               "c",
               "l",
               "company",
-              "department",
-              "accountExpires",
-              "memberOf"
+              "department"
     ]
 }
