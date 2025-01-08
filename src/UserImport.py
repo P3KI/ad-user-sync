@@ -1,9 +1,19 @@
 import sys
 import json
-from pyad import adcontainer, aduser, adquery, adgroup, pyadexceptions
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from pywintypes import com_error
+from pyad.adcontainer import ADContainer
+from pyad.adgroup import ADGroup
+from pyad.adquery import ADQuery
+from pyad.aduser import ADUser
+from pyad.pyadexceptions import win32Exception
+
+try:
+    from pywintypes import com_error
+except ImportError:
+    # todo: try if this works on windows. if yes: get rid of the pywin32 dependency
+    from pyad.pyadexceptions import comException as com_error
+
 from src import InteractiveImport
 
 # Attributes that can not be applied using ADUser.update_attributes() function, but require special handling
@@ -36,7 +46,7 @@ class UserImporter:
         self.pending_actions_file = config.get("InteractiveActionsOutput", "Pending.json")
 
     # Appends the base path to turn a subpath into a full path (the distinguished name)
-    def full_path(self, subpath: str = ""):
+    def full_path(self, subpath: str = "") -> str:
         if len(subpath) > 0:
             return subpath + "," + self.base_path
         else:
@@ -46,21 +56,19 @@ class UserImporter:
     def get_user_container(self, sub_path: str):
         dn = self.full_path(sub_path)
         try:
-            container = adcontainer.ADContainer.from_dn(dn)
-        except (com_error, pyadexceptions.win32Exception) as e:
+            return ADContainer.from_dn(dn)
+        except (com_error, win32Exception) as e:
             error("Error: Loading managed user path from config failed. Does the path exist in AD?")
             error(f"    Path entry: ManagedUserPath : {sub_path}")
             error(f"    Looking for path: {dn}")
             error(f"    {e}")
             exit(2)
 
-        return container
-
     # Create AD group object from distinguished name. Cached.
     def get_group(self, dn: str):
         group = self.groups.get(dn, None)
         if group is None:
-            group = adgroup.ADGroup.from_dn(dn)
+            group = ADGroup.from_dn(dn)
             self.groups[dn] = group
 
         return group
@@ -86,7 +94,7 @@ class UserImporter:
             mapped = group_map[sub_path]
             try:
                 ret[sub_path] = self.get_group(self.full_path(mapped))
-            except (com_error, pyadexceptions.win32Exception) as e:
+            except (com_error, win32Exception) as e:
                 error(
                     "Error: Failed to load group mapping from configuration. Do all specified groups exist in AD?"
                 )
@@ -103,7 +111,7 @@ class UserImporter:
         for sub_path in group_list:
             try:
                 ret.add(self.get_group(self.full_path(sub_path)))
-            except (com_error, pyadexceptions.win32Exception) as e:
+            except (com_error, win32Exception) as e:
                 error(
                     "Error: Failed to load restricted groups from configuration. Do all specified groups exist in AD?"
                 )
@@ -138,8 +146,8 @@ class UserImporter:
         return self.config["PrefixAccountNames"] + name
 
     # Find an existing AD user by common name (cn)
-    def find_user(self, parent: adcontainer.ADContainer, cn: str):
-        q = adquery.ADQuery()
+    def find_user(self, parent: ADContainer, cn: str):
+        q = ADQuery()
         q.execute_query(
             attributes=["distinguishedName"],
             where_clause=f"objectClass = 'user' AND cn = '{cn}'",
@@ -149,10 +157,10 @@ class UserImporter:
             return None
         else:
             dn = q.get_single_result()["distinguishedName"]
-            return aduser.ADUser.from_dn(dn)
+            return ADUser.from_dn(dn)
 
-    def find_conflicting_user(self, domain: adcontainer.ADContainer, account_name: str):
-        q = adquery.ADQuery()
+    def find_conflicting_user(self, domain: ADContainer, account_name: str):
+        q = ADQuery()
         q.execute_query(
             attributes=["distinguishedName"],
             where_clause=f"objectClass = 'user' AND sAMAccountName = '{account_name}'",
@@ -162,7 +170,7 @@ class UserImporter:
             return None
         else:
             dn = q.get_single_result()["distinguishedName"]
-            return aduser.ADUser.from_dn(dn)
+            return ADUser.from_dn(dn)
 
     def run(self):
         # Read users
@@ -179,7 +187,7 @@ class UserImporter:
         # Path where all managed users will be created.
 
         # Managed users currently in AD
-        old_users = self.user_container.get_children(recursive=False, filter=[aduser.ADUser])
+        old_users = self.user_container.get_children(recursive=False, filter=[ADUser])
 
         # All users imported during this run
         new_users = set()
@@ -203,7 +211,7 @@ class UserImporter:
                     u = parent.create_user(
                         cn, enable=False, optional_attributes=(attributes | {"sAMAccountName": account_name})
                     )
-                except (com_error, pyadexceptions.win32Exception) as e:
+                except (com_error, win32Exception) as e:
                     conflict_user = self.find_conflicting_user(parent.get_domain(), account_name)
                     if conflict_user:
                         print(f"Failed to create user '{cn}' due to account name already in use: {account_name}")

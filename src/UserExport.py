@@ -1,5 +1,8 @@
-from pyad import adquery, pyadutils
+from pyad import pyadutils
 import json
+
+from pyad.adquery import ADQuery
+
 # import argparse
 
 # parser = argparse.ArgumentParser(
@@ -113,7 +116,7 @@ class UserExporter:
 
         # print(user_filter)
 
-        q = adquery.ADQuery()
+        q = ADQuery()
         q.execute_query(attributes=attributes, where_clause=user_filter, base_dn=self.full_path(sub_path))
 
         users = []
