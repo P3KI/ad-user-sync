@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from pyad import adquery, pyadutils
 import json
 # import argparse
