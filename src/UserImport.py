@@ -52,13 +52,13 @@ class UserImporter:
         self.pending_actions_file = config.get("InteractiveActionsOutput", "Pending.json")
 
     # Create AD container object from distinguished name.
-    def get_user_container(self, sub_path: str):
-        dn = self.full_path(sub_path)
+    def get_user_container(self, sub_path: str) -> ADContainer:
+        dn = self.config.full_path(sub_path)
         try:
             return ADContainer.from_dn(dn)
         except (com_error, win32Exception) as e:
             error("Error: Loading managed user path from config failed. Does the path exist in AD?")
-            error(f"    Path entry: ManagedUserPath : {sub_path}")
+            error(f"    Path entry: ManagedUserPath: {sub_path}")
             error(f"    Looking for path: {dn}")
             error(f"    {e}")
             exit(2)
@@ -118,9 +118,6 @@ class UserImporter:
 
         return ret
 
-    def map_name(self, name: str):
-        return self.config["PrefixAccountNames"] + name
-
     def find_single_user(self, domain: ADContainer, where: str) -> ADUser | None:
         query = ADQuery()
         query.execute_query(
@@ -159,8 +156,8 @@ class UserImporter:
             groups = self.map_groups(user["memberOf"])
 
             # Apply name prefixes, if configured
-            cn = self.map_name(user["cn"])
-            account_name = self.map_name(user["sAMAccountName"])
+            cn = self.config.prefix_account_name(user["cn"])
+            account_name = self.config.prefix_account_name(user["sAMAccountName"])
 
             # Extract attribute values, so they can be applied to the target domain.
             attributes = {k: v for k, v in user.items() if k not in ATTRIBUTE_BLACKLIST}

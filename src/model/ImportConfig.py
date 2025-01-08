@@ -1,6 +1,8 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 from textwrap import dedent
-from typing import Annotated, Dict, List
+from typing import Annotated, Dict, List, Callable
+
+from pydantic import BaseModel, Field, AfterValidator
 
 
 def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
@@ -170,6 +172,9 @@ class ImportConfig(BaseModel):
             return sub_path + "," + self.base_path
         else:
             return self.base_path
+
+    def prefix_account_name(self, name: str) -> str:
+        return self.prefix_account_names + name
 
     def get_default_expiration_date(self) -> datetime:
         return datetime.now() + self.default_expiration
