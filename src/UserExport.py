@@ -50,8 +50,8 @@ class UserExporter:
 
     def filter_date(self, date):
         # https://web.archive.org/web/20171214045055/http://docs.activestate.com/activepython/2.6/pywin32/html/com/help/active_directory.html#time
-        # "Time in active directory is stored in a 64 bit integer that keeps track of the number of 100-nanosecond intervals which have passed since January 1, 1601.
-        # The 64-bit value uses 2 32 bit parts to store the time."
+        # "Time in active directory is stored in a 64-bit integer that keeps track of the number of 100-nanosecond
+        # intervals which have passed since January 1, 1601. The 64-bit value uses 2 32 bit parts to store the time."
 
         ts = pyadutils.convert_bigint(date)
         if ts == 0:  # If no expire date is set, the date object will convert to 0
@@ -73,9 +73,8 @@ class UserExporter:
 
         return ret
 
-    def filter_groups(
-        self, groups
-    ):  # Filter out the groups sub-path. Cut off the base path that all search results share.
+    # Filter out the groups sub-path. Cut off the base path that all search results share.
+    def filter_groups(self, groups):
         if groups is None:
             return []
 
@@ -90,14 +89,14 @@ class UserExporter:
     def filter_disabled(self, uac_flags):
         return (uac_flags & self.UAC_ACCOUNTDISABLE) != 0
 
-    ## Appends the base path to turn a subpath into a full path (the distinguished name)
+    # Appends the base path to turn a subpath into a full path (the distinguished name)
     def full_path(self, subpath: str = ""):
         if len(subpath) > 0:
             return subpath + "," + self.base_path
         else:
             return self.base_path
 
-    ## Removes the base path to turn a distinguished name into a relative path
+    # Removes the base path to turn a distinguished name into a relative path
     def sub_path(self, dn):
         return dn[0 : -len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
 

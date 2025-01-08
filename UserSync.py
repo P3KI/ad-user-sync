@@ -4,21 +4,37 @@ import argparse
 import json
 import sys
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        prog="UserImport", description="Import/Export Windows ActiveDirectory user accounts"
+        prog="UserImport",
+        description="Import/Export Windows ActiveDirectory user accounts",
     )
 
-    parser.add_argument("--config", "-c", default="UserSync.cfg", help="Configuration file to use. See README.")
+    parser.add_argument(
+        "--config",
+        "-c",
+        default="UserSync.cfg",
+        help="Configuration file to use. See README.",
+    )
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
-        "--export", "-e", "-o", action="store_true", help="Export Mode: File to write user account data to"
+        "--export",
+        "-e",
+        "-o",
+        action="store_true",
+        help="Export Mode: File to write user account data to",
     )
     group.add_argument(
-        "--import", "-i", action="store_true", help="Import Mode: File containing the users to import"
+        "--import",
+        "-i",
+        action="store_true",
+        help="Import Mode: File containing the users to import",
     )
     group.add_argument(
-        "--resolve", "-r", action="store_true", help="Import Mode: File containing the users to import"
+        "--resolve",
+        "-r",
+        action="store_true",
+        help="Import Mode: File containing the users to import",
     )
     parser.add_argument("user_file", nargs=1, help="User list file for import/export")
 

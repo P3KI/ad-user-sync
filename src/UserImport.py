@@ -2,13 +2,12 @@ import sys
 from pyad import adcontainer, aduser, adquery, adgroup, pyadexceptions
 import json
 
-# import argparse
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from pywintypes import com_error
 from src import InteractiveImport
 
-## Attributes that can not be applied using ADUser.update_attributes() function, but require special handling
+# Attributes that can not be applied using ADUser.update_attributes() function, but require special handling
 ATTRIBUTE_BLACKLIST = {
     "cn",  # Only used during user creation
     "sAMAccountName",  # Only set during user creation, not updated after wards
@@ -20,7 +19,7 @@ ATTRIBUTE_BLACKLIST = {
 }
 
 
-## Print error message
+# Print error message
 def error(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
@@ -37,14 +36,14 @@ class UserImporter:
         self.default_expiration = self.make_expiration_date(config.get("DefaultExpiration", "default"))
         self.pending_actions_file = config.get("InteractiveActionsOutput", "Pending.json")
 
-    ## Appends the base path to turn a subpath into a full path (the distinguished name)
+    # Appends the base path to turn a subpath into a full path (the distinguished name)
     def full_path(self, subpath: str = ""):
         if len(subpath) > 0:
             return subpath + "," + self.base_path
         else:
             return self.base_path
 
-    ## Create AD container object from distinguished name.
+    # Create AD container object from distinguished name.
     def get_user_container(self, sub_path: str):
         dn = self.full_path(sub_path)
         try:
@@ -58,7 +57,7 @@ class UserImporter:
 
         return container
 
-    ## Create AD group object from distinguished name. Cached.
+    # Create AD group object from distinguished name. Cached.
     def get_group(self, dn: str):
         group = self.groups.get(dn, None)
         if group is None:
@@ -67,7 +66,7 @@ class UserImporter:
 
         return group
 
-    ## Map exported group names to local AD groups
+    # Map exported group names to local AD groups
     def map_groups(self, sub_paths):
         ret = []
         for sub_path in sub_paths:
@@ -81,7 +80,7 @@ class UserImporter:
 
         return ret
 
-    ## Create a map for all specified sub-paths to local managed AD Groups.
+    # Create a map for all specified sub-paths to local managed AD Groups.
     def make_group_map(self, group_map):
         ret = {}
         for sub_path in group_map.keys():
@@ -99,7 +98,7 @@ class UserImporter:
 
         return ret
 
-    ## Create a list of ADGroups from all specified sub-paths.
+    # Create a list of ADGroups from all specified sub-paths.
     def make_group_list(self, group_list):
         ret = set()
         for sub_path in group_list:
@@ -247,7 +246,8 @@ class UserImporter:
             else:
                 u.set_expiration(self.default_expiration)
 
-            # If the user should be enabled, but is disabled, add an interactive action for it. Do not enable automatically.
+            # If the user should be enabled, but is disabled, add an interactive action for it.
+            # Do not enable automatically.
             if u._ldap_adsi_obj.AccountDisabled and not user["disabled"]:
                 print("User", u, "not automatically enabled.")
                 InteractiveImport.add_action(InteractiveImport.UserEnableAction(u.dn))
