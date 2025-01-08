@@ -2,7 +2,14 @@ from datetime import timedelta
 from textwrap import dedent
 from typing import Annotated, Dict, List
 
-from pydantic import BaseModel, Field
+
+def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
+    def wrapped_min(value: timedelta) -> timedelta:
+        if value < minimum:
+            raise ValueError(f"Duration is too short: {value}. (Minimum {minimum})")
+        return value
+
+    return wrapped_min
 
 
 class ImportConfig(BaseModel):
@@ -129,9 +136,14 @@ class ImportConfig(BaseModel):
                 The expiration date is extended by the specified time every time the import script is done.
                 If the source account expiration date is closer than the specified time, the source value is
                 used instead.
+                
+                The default value is 1 month and 1 day.
+                
+                The minimum value is 1 day. 
             """),
             examples=["P1M1D"],
         ),
+        AfterValidator(min_timedelta(timedelta(days=1))),
     ]
 
     interactive_actions_output: Annotated[
@@ -152,7 +164,12 @@ class ImportConfig(BaseModel):
         ),
     ]
 
+    # Appends the base path to turn a sub_path into a full path (the distinguished name)
+    def full_path(self, sub_path: str = "") -> str:
+        if len(sub_path) > 0:
+            return sub_path + "," + self.base_path
+        else:
+            return self.base_path
 
-
-
-
+    def get_default_expiration_date(self) -> datetime:
+        return datetime.now() + self.default_expiration

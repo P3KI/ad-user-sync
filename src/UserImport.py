@@ -36,13 +36,15 @@ def error(*args, **kwargs):
 class UserImporter:
     def __init__(self, file, config):
         self.groups = {}
+    config: ImportConfig
+    input_file: str
+
+    def __init__(self, input_file: str, config: ImportConfig):
         self.config = config
-        self.input_file = file
-        self.base_path = config["BasePath"]
+        self.input_file = input_file
         self.user_container = self.get_user_container(config.get("ManagedUserPath", "CN=P3KI Managed"))
         self.group_map = self.make_group_map(config.get("GroupMap", []))
         self.restricted_groups = self.make_group_list(config.get("RestrictedGroups", []))
-        self.default_expiration = self.make_expiration_date(config.get("DefaultExpiration", "default"))
         self.pending_actions_file = config.get("InteractiveActionsOutput", "Pending.json")
 
     # Appends the base path to turn a subpath into a full path (the distinguished name)
@@ -121,26 +123,6 @@ class UserImporter:
                 exit(1)
 
         return ret
-
-    def make_expiration_date(self, cfg):
-        years = 0
-        months = 1
-        days = 1
-
-        if cfg is not None:
-            years = cfg.get("Years", 0)
-            months = cfg.get("Months", 0)
-            days = cfg.get("Days", 0)
-
-        now = datetime.now()
-
-        expiration = now + relativedelta(years=years, months=months, days=days)
-        min_exp = now + relativedelta(days=1)
-
-        if expiration <= min_exp:
-            error(f"Managed user expiration time is very short, ensure this is the intended setting: {cfg}")
-
-        return expiration
 
     def map_name(self, name: str):
         return self.config["PrefixAccountNames"] + name
@@ -233,16 +215,14 @@ class UserImporter:
             ###
             # Handle special attributes that can not be set via update_attributes, because they require custom logic.
             ###
+
+            # set expiration to at least the default_expiration
+            expiration_date = self.config.get_default_expiration_date()
             if user["accountExpires"]:
-                user_expiration = datetime.fromisoformat(user["accountExpires"])
-                if (self.default_expiration is datetime) and (
-                    user_expiration > self.default_expiration
-                ):  # Limit to self.default_expiration date
-                    u.set_expiration(self.default_expiration)
-                else:
-                    u.set_expiration(user_expiration)
-            else:
-                u.set_expiration(self.default_expiration)
+                account_expires = datetime.fromisoformat(user["accountExpires"])
+                if account_expires > expiration_date:
+                    expiration_date = account_expires
+            u.set_expiration(expiration_date)
 
             # If the user should be enabled, but is disabled, add an interactive action for it.
             # Do not enable automatically.
