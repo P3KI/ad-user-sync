@@ -1,6 +1,8 @@
 import sys
 import json
 from datetime import datetime
+from typing import Dict
+
 from dateutil.relativedelta import relativedelta
 from pyad.adcontainer import ADContainer
 from pyad.adgroup import ADGroup
@@ -8,13 +10,15 @@ from pyad.adquery import ADQuery
 from pyad.aduser import ADUser
 from pyad.pyadexceptions import win32Exception
 
+from src import InteractiveImport
+from src.model import ImportConfig
+
 try:
     from pywintypes import com_error
 except ImportError:
     # todo: try if this works on windows. if yes: get rid of the pywin32 dependency
     from pyad.pyadexceptions import comException as com_error
 
-from src import InteractiveImport
 
 # Attributes that can not be applied using ADUser.update_attributes() function, but require special handling
 ATTRIBUTE_BLACKLIST = {
@@ -34,25 +38,18 @@ def error(*args, **kwargs):
 
 
 class UserImporter:
-    def __init__(self, file, config):
-        self.groups = {}
+    _group_cache: Dict[str, ADGroup]
     config: ImportConfig
     input_file: str
 
     def __init__(self, input_file: str, config: ImportConfig):
+        self._group_cache = {}
         self.config = config
         self.input_file = input_file
         self.user_container = self.get_user_container(config.get("ManagedUserPath", "CN=P3KI Managed"))
         self.group_map = self.make_group_map(config.get("GroupMap", []))
         self.restricted_groups = self.make_group_list(config.get("RestrictedGroups", []))
         self.pending_actions_file = config.get("InteractiveActionsOutput", "Pending.json")
-
-    # Appends the base path to turn a subpath into a full path (the distinguished name)
-    def full_path(self, subpath: str = "") -> str:
-        if len(subpath) > 0:
-            return subpath + "," + self.base_path
-        else:
-            return self.base_path
 
     # Create AD container object from distinguished name.
     def get_user_container(self, sub_path: str):
@@ -67,12 +64,11 @@ class UserImporter:
             exit(2)
 
     # Create AD group object from distinguished name. Cached.
-    def get_group(self, dn: str):
-        group = self.groups.get(dn, None)
+    def resolve_group(self, dn: str) -> ADGroup:
+        group = self._group_cache.get(dn)
         if group is None:
             group = ADGroup.from_dn(dn)
-            self.groups[dn] = group
-
+            self._group_cache[dn] = group
         return group
 
     # Map exported group names to local AD groups
@@ -95,13 +91,11 @@ class UserImporter:
         for sub_path in group_map.keys():
             mapped = group_map[sub_path]
             try:
-                ret[sub_path] = self.get_group(self.full_path(mapped))
+                ret[sub_path] = self.resolve_group(self.config.full_path(mapped))
             except (com_error, win32Exception) as e:
-                error(
-                    "Error: Failed to load group mapping from configuration. Do all specified groups exist in AD?"
-                )
+                error("Error: Failed to load group mapping from configuration. Do all specified groups exist in AD?")
                 error(f"    Failed at mapping entry: {sub_path} : {mapped}")
-                error(f"    Looking for group: {self.full_path(mapped)}")
+                error(f"    Looking for group: {self.config.full_path(mapped)}")
                 error(f"    {e}")
                 exit(1)
 
@@ -112,13 +106,13 @@ class UserImporter:
         ret = set()
         for sub_path in group_list:
             try:
-                ret.add(self.get_group(self.full_path(sub_path)))
+                ret.add(self.resolve_group(self.config.full_path(sub_path)))
             except (com_error, win32Exception) as e:
                 error(
                     "Error: Failed to load restricted groups from configuration. Do all specified groups exist in AD?"
                 )
                 error(f"    Failed at group entry: {sub_path}")
-                error(f"    Looking for group: {self.full_path(sub_path)}")
+                error(f"    Looking for group: {self.config.full_path(sub_path)}")
                 error(f"    {e}")
                 exit(1)
 
@@ -191,7 +185,9 @@ class UserImporter:
                 print("Creating user:", cn)
                 try:
                     u = parent.create_user(
-                        cn, enable=False, optional_attributes=(attributes | {"sAMAccountName": account_name})
+                        cn,
+                        enable=False,
+                        optional_attributes=(attributes | {"sAMAccountName": account_name}),
                     )
                 except (com_error, win32Exception) as e:
                     conflict_user = self.find_conflicting_user(parent.get_domain(), account_name)
