@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "ad-permission-sync"
+version = "0.1.0"
+description = "A tool to export users from a Windows Active Directory and import them into another."
+authors = ["Philipp Claves <philipp@p3ki.com>", "Felix Hofmann <felix.hofmann@fxhm.de>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pyad = "^0.6.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
