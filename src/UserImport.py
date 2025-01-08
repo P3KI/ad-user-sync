@@ -121,32 +121,18 @@ class UserImporter:
     def map_name(self, name: str):
         return self.config["PrefixAccountNames"] + name
 
-    # Find an existing AD user by common name (cn)
-    def find_user(self, parent: ADContainer, cn: str):
-        q = ADQuery()
-        q.execute_query(
+    def find_single_user(self, domain: ADContainer, where: str) -> ADUser | None:
+        query = ADQuery()
+        query.execute_query(
             attributes=["distinguishedName"],
-            where_clause=f"objectClass = 'user' AND cn = '{cn}'",
-            base_dn=parent.dn,
-        )
-        if len(q) == 0:
-            return None
-        else:
-            dn = q.get_single_result()["distinguishedName"]
-            return ADUser.from_dn(dn)
-
-    def find_conflicting_user(self, domain: ADContainer, account_name: str):
-        q = ADQuery()
-        q.execute_query(
-            attributes=["distinguishedName"],
-            where_clause=f"objectClass = 'user' AND sAMAccountName = '{account_name}'",
+            where_clause=f"objectClass = 'user' AND {where}",
             base_dn=domain.dn,
         )
-        if len(q) == 0:
+        if query.get_row_count() == 0:
             return None
-        else:
-            dn = q.get_single_result()["distinguishedName"]
-            return ADUser.from_dn(dn)
+
+        dn = query.get_single_result()["distinguishedName"]
+        return ADUser.from_dn(dn)
 
     def run(self):
         # Read users
@@ -180,7 +166,7 @@ class UserImporter:
             attributes = {k: v for k, v in user.items() if k not in ATTRIBUTE_BLACKLIST}
 
             # Create user or update user attributes
-            u = self.find_user(parent, cn)
+            u = self.find_single_user(parent, f"cn = '{cn}'")
             if u is None:
                 print("Creating user:", cn)
                 try:
@@ -190,7 +176,7 @@ class UserImporter:
                         optional_attributes=(attributes | {"sAMAccountName": account_name}),
                     )
                 except (com_error, win32Exception) as e:
-                    conflict_user = self.find_conflicting_user(parent.get_domain(), account_name)
+                    conflict_user = self.find_single_user(parent.get_domain(), f"sAMAccountName = '{account_name}'")
                     if conflict_user:
                         print(f"Failed to create user '{cn}' due to account name already in use: {account_name}")
                         InteractiveImport.add_action(
