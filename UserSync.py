@@ -45,7 +45,7 @@ if __name__ == "__main__":
         with open(args.config) as cfg:
             config = json.load(cfg)
     except FileNotFoundError:
-        print("Error: Config file '{}' not found.".format(args.config), file=sys.stderr)
+        print(f"Error: Config file '{args.config}' not found.", file=sys.stderr)
         exit(1)
 
     print("Args:", args)

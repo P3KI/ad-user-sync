@@ -1,7 +1,6 @@
 import sys
-from pyad import adcontainer, aduser, adquery, adgroup, pyadexceptions
 import json
-
+from pyad import adcontainer, aduser, adquery, adgroup, pyadexceptions
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from pywintypes import com_error
@@ -50,9 +49,9 @@ class UserImporter:
             container = adcontainer.ADContainer.from_dn(dn)
         except (com_error, pyadexceptions.win32Exception) as e:
             error("Error: Loading managed user path from config failed. Does the path exist in AD?")
-            error("       Path entry: ManagedUserPath :", sub_path)
-            error("       Looking for path:", dn)
-            error("      ", e)
+            error(f"    Path entry: ManagedUserPath : {sub_path}")
+            error(f"    Looking for path: {dn}")
+            error(f"    {e}")
             exit(2)
 
         return container
@@ -91,9 +90,9 @@ class UserImporter:
                 error(
                     "Error: Failed to load group mapping from configuration. Do all specified groups exist in AD?"
                 )
-                error("       Failed at mapping entry:", sub_path, ":", mapped)
-                error("       Looking for group:", self.full_path(mapped))
-                error("      ", e)
+                error(f"    Failed at mapping entry: {sub_path} : {mapped}")
+                error(f"    Looking for group: {self.full_path(mapped)}")
+                error(f"    {e}")
                 exit(1)
 
         return ret
@@ -108,9 +107,9 @@ class UserImporter:
                 error(
                     "Error: Failed to load restricted groups from configuration. Do all specified groups exist in AD?"
                 )
-                error("       Failed at group entry:", sub_path)
-                error("       Looking for group:", self.full_path(sub_path))
-                error("      ", e)
+                error(f"    Failed at group entry: {sub_path}")
+                error(f"    Looking for group: {self.full_path(sub_path)}")
+                error(f"    {e}")
                 exit(1)
 
         return ret
@@ -131,7 +130,7 @@ class UserImporter:
         min_exp = now + relativedelta(days=1)
 
         if expiration <= min_exp:
-            error("Managed user expiration time is very short, ensure this is the intended setting:", cfg)
+            error(f"Managed user expiration time is very short, ensure this is the intended setting: {cfg}")
 
         return expiration
 
@@ -143,7 +142,7 @@ class UserImporter:
         q = adquery.ADQuery()
         q.execute_query(
             attributes=["distinguishedName"],
-            where_clause="objectClass = 'user' AND cn = '" + cn + "'",
+            where_clause=f"objectClass = 'user' AND cn = '{cn}'",
             base_dn=parent.dn,
         )
         if len(q) == 0:
@@ -156,7 +155,7 @@ class UserImporter:
         q = adquery.ADQuery()
         q.execute_query(
             attributes=["distinguishedName"],
-            where_clause="objectClass = 'user' AND sAMAccountName = '" + account_name + "'",
+            where_clause=f"objectClass = 'user' AND sAMAccountName = '{account_name}'",
             base_dn=domain.dn,
         )
         if len(q) == 0:
@@ -193,7 +192,7 @@ class UserImporter:
             cn = self.map_name(user["cn"])
             account_name = self.map_name(user["sAMAccountName"])
 
-            # Extract attribute values so they can be applied to the target domain.
+            # Extract attribute values, so they can be applied to the target domain.
             attributes = {k: v for k, v in user.items() if k not in ATTRIBUTE_BLACKLIST}
 
             # Create user or update user attributes
@@ -207,10 +206,7 @@ class UserImporter:
                 except (com_error, pyadexceptions.win32Exception) as e:
                     conflict_user = self.find_conflicting_user(parent.get_domain(), account_name)
                     if conflict_user:
-                        print(
-                            "Failed to create user '" + cn + "' due to account name already in use:",
-                            account_name,
-                        )
+                        print(f"Failed to create user '{cn}' due to account name already in use: {account_name}")
                         InteractiveImport.add_action(
                             InteractiveImport.UserResolveAccountNameConflict(
                                 cn, conflict_user.cn, account_name, attributes
@@ -218,15 +214,9 @@ class UserImporter:
                         )
                         continue
                     else:
-                        error(
-                            "Error: Failed to create user '"
-                            + cn
-                            + "' with login name '"
-                            + attributes["sAMAccountName"]
-                            + "'"
-                        )
-                        error("       Does another use with this login name already exists?")
-                        error("      ", e)
+                        error(f"Error: Failed to create user '{cn}' with login name '{attributes['sAMAccountName']}'")
+                        error(f"    Does another use with this login name already exists?")
+                        error(f"    {e}")
                         exit(3)
             else:
                 print("Updating user:", u.cn)
@@ -249,7 +239,7 @@ class UserImporter:
             # If the user should be enabled, but is disabled, add an interactive action for it.
             # Do not enable automatically.
             if u._ldap_adsi_obj.AccountDisabled and not user["disabled"]:
-                print("User", u, "not automatically enabled.")
+                print(f"User {u} not automatically enabled.")
                 InteractiveImport.add_action(InteractiveImport.UserEnableAction(u.dn))
 
             if user["disabled"]:
@@ -272,24 +262,24 @@ class UserImporter:
             added_members = [u for u in new_members if u not in old_members]
 
             if len(removed_members) > 0:
-                print("Removing users from group '" + group.cn + "' :", removed_members)
+                print(f"Removing users from group '{group.cn}': {removed_members}")
                 group.remove_members(removed_members)
 
             if len(added_members) > 0:
                 if group in self.restricted_groups:
                     for u in added_members:
-                        print("User", u, "not automatically adding to restricted group :", group.cn)
+                        print(f"User {u} not automatically adding to restricted group: {group.cn}")
                         InteractiveImport.add_action(InteractiveImport.UserJoinGroupAction(u.dn, group.dn))
                 else:
-                    print("Adding users to group '" + group.cn + "' :", added_members)
+                    print(f"Adding users to group '{group.cn}': {added_members}")
                     group.add_members(added_members)
 
         removed_users = [u for u in old_users if u not in new_users]
         for u in removed_users:
-            print("Disabling user:", u.cn, "(no longer in import list)")
+            print(f"Disabling user: {u.cn} (no longer in import list)")
             u.disable()
 
         if self.pending_actions_file is not None:
             if InteractiveImport.any_actions():
-                print("Saving action requiring intervention to", self.pending_actions_file)
+                print(f"Saving action requiring intervention to {self.pending_actions_file}")
             InteractiveImport.save(self.pending_actions_file)  # Save either way

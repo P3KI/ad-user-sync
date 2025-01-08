@@ -67,7 +67,7 @@ class UserExporter:
         # Remove common name
         pos = ret.find(",")
         if pos >= 0:
-            ret = ret[pos + 1 :]
+            ret = ret[pos + 1:]
         else:
             ret = ""
 
@@ -90,21 +90,21 @@ class UserExporter:
         return (uac_flags & self.UAC_ACCOUNTDISABLE) != 0
 
     # Appends the base path to turn a subpath into a full path (the distinguished name)
-    def full_path(self, subpath: str = ""):
-        if len(subpath) > 0:
-            return subpath + "," + self.base_path
+    def full_path(self, sub_path: str = ""):
+        if len(sub_path) > 0:
+            return f"{sub_path},{self.base_path}"
         else:
             return self.base_path
 
     # Removes the base path to turn a distinguished name into a relative path
     def sub_path(self, dn):
-        return dn[0 : -len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
+        return dn[0:-len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
 
     def build_group_filter(self, groups_dn):
-        group_dns = [("memberOf='" + self.full_path(g) + "'") for g in groups_dn]
-        return "(" + (" OR ".join(group_dns)) + ")"
+        group_dns = [f"memberOf='{self.full_path(g)}'" for g in groups_dn]
+        return f"({' OR '.join(group_dns)})"
 
-    def get_users_in_path(self, subpath, groups):
+    def get_users_in_path(self, sub_path, groups):
         attributes = list(map(lambda p: p.attribute, self.attributes))
 
         user_filter = "objectClass = 'user'"
@@ -114,7 +114,7 @@ class UserExporter:
         # print(user_filter)
 
         q = adquery.ADQuery()
-        q.execute_query(attributes=attributes, where_clause=user_filter, base_dn=self.full_path(subpath))
+        q.execute_query(attributes=attributes, where_clause=user_filter, base_dn=self.full_path(sub_path))
 
         users = []
         for row in q.get_results():
