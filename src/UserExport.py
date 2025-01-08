@@ -17,9 +17,9 @@ import json
 
 REQUIRED_ATTRIBUTES = {"sAMAccountName", "cn", "disabled", "accountExpires", "memberOf"}
 
-class ADProperty:
 
-    def __init__(self, parent, name, special = None):
+class ADProperty:
+    def __init__(self, parent, name, special=None):
         self.parent = parent
         self.name = name
         if special is None:
@@ -29,22 +29,23 @@ class ADProperty:
             self.attribute = special["ldapAttribute"]
             self.filter_function = special["filter"]
 
-
     def filter(self, value):
         if self.filter_function is not None:
             return self.filter_function(self.parent, value)
         else:
             return value
 
+
 class UserExporter:
-
-
     def __init__(self, file, config):
-        self.config     = config
-        self.base_path  = config["BasePath"]
-        self.attributes = [ADProperty(self, a, UserExporter.SPECIAL_ATTRIBUTES.get(a, None)) for a in set(config.get("Attributes", [])).union(REQUIRED_ATTRIBUTES)]
-        self.sub_paths  = config.get("SearchSubPaths", [""])
-        self.groups     = config.get("SearchGroups", None)
+        self.config = config
+        self.base_path = config["BasePath"]
+        self.attributes = [
+            ADProperty(self, a, UserExporter.SPECIAL_ATTRIBUTES.get(a, None))
+            for a in set(config.get("Attributes", [])).union(REQUIRED_ATTRIBUTES)
+        ]
+        self.sub_paths = config.get("SearchSubPaths", [""])
+        self.groups = config.get("SearchGroups", None)
         self.output_file = file
 
         print([a.name for a in self.attributes])
@@ -55,26 +56,28 @@ class UserExporter:
         # The 64-bit value uses 2 32 bit parts to store the time."
 
         ts = pyadutils.convert_bigint(date)
-        if ts == 0: #If no expire date is set, the date object will convert to 0
+        if ts == 0:  # If no expire date is set, the date object will convert to 0
             return None
-        elif ts == 0x7fffffffffffffff: #Or to MAX_INT64, not sure why.
+        elif ts == 0x7FFFFFFFFFFFFFFF:  # Or to MAX_INT64, not sure why.
             return None
         else:
             return pyadutils.convert_datetime(date).isoformat()
 
     def filter_sub_path(self, dn):
-        #Remove base path
+        # Remove base path
         ret = self.sub_path(dn)
-        #Remove common name
+        # Remove common name
         pos = ret.find(",")
         if pos >= 0:
-            ret = ret[pos+1:]
+            ret = ret[pos + 1 :]
         else:
             ret = ""
 
         return ret
 
-    def filter_groups(self, groups): #Filter out the groups sub-path. Cut off the base path that all search results share.
+    def filter_groups(
+        self, groups
+    ):  # Filter out the groups sub-path. Cut off the base path that all search results share.
         if groups is None:
             return []
 
@@ -89,9 +92,8 @@ class UserExporter:
     def filter_disabled(self, uac_flags):
         return (uac_flags & self.UAC_ACCOUNTDISABLE) != 0
 
-
     ## Appends the base path to turn a subpath into a full path (the distinguished name)
-    def full_path(self, subpath : str = ""):
+    def full_path(self, subpath: str = ""):
         if len(subpath) > 0:
             return subpath + "," + self.base_path
         else:
@@ -99,13 +101,11 @@ class UserExporter:
 
     ## Removes the base path to turn a distinguished name into a relative path
     def sub_path(self, dn):
-        return dn[0:-len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
-
+        return dn[0 : -len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
 
     def build_group_filter(self, groups_dn):
-        group_dns = [("memberOf='" + self.full_path(g) + "'" ) for g in groups_dn]
+        group_dns = [("memberOf='" + self.full_path(g) + "'") for g in groups_dn]
         return "(" + (" OR ".join(group_dns)) + ")"
-
 
     def get_users_in_path(self, subpath, groups):
         attributes = list(map(lambda p: p.attribute, self.attributes))
@@ -114,7 +114,7 @@ class UserExporter:
         if groups is not None and len(groups) > 0:
             user_filter += " AND " + self.build_group_filter(groups)
 
-        #print(user_filter)
+        # print(user_filter)
 
         q = adquery.ADQuery()
         q.execute_query(attributes=attributes, where_clause=user_filter, base_dn=self.full_path(subpath))
@@ -130,7 +130,6 @@ class UserExporter:
 
         return users
 
-
     def get_users(self, search_paths, search_groups):
         users = []
         for search_path in search_paths:
@@ -139,7 +138,6 @@ class UserExporter:
         return users
 
     def run(self):
-
         users = self.get_users(self.sub_paths, self.groups)
 
         for user in users:
@@ -148,11 +146,10 @@ class UserExporter:
         with open(self.output_file, "w") as out:
             json.dump(users, out, ensure_ascii=False, indent=4)
 
-
     SPECIAL_ATTRIBUTES = {
-        "subPath"        : {"ldapAttribute" : "distinguishedName", "filter" : filter_sub_path},
-        "accountExpires" : {"ldapAttribute" : "accountExpires",    "filter" : filter_date},
-        "memberOf"       : {"ldapAttribute" : "memberOf",          "filter" : filter_groups},
-        "disabled"       : {"ldapAttribute" : "userAccountControl","filter" : filter_disabled}
+        "subPath": {"ldapAttribute": "distinguishedName", "filter": filter_sub_path},
+        "accountExpires": {"ldapAttribute": "accountExpires", "filter": filter_date},
+        "memberOf": {"ldapAttribute": "memberOf", "filter": filter_groups},
+        "disabled": {"ldapAttribute": "userAccountControl", "filter": filter_disabled},
     }
     UAC_ACCOUNTDISABLE = 0x02
