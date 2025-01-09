@@ -70,7 +70,7 @@ class UserExporter:
         # Remove common name
         pos = ret.find(",")
         if pos >= 0:
-            ret = ret[pos + 1:]
+            ret = ret[pos + 1 :]
         else:
             ret = ""
 
@@ -101,7 +101,7 @@ class UserExporter:
 
     # Removes the base path to turn a distinguished name into a relative path
     def sub_path(self, dn):
-        return dn[0:-len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
+        return dn[0 : -len(self.base_path) - 1] if dn.endswith(self.base_path) else dn
 
     def build_group_filter(self, groups_dn):
         group_dns = [f"memberOf='{self.full_path(g)}'" for g in groups_dn]

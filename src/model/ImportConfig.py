@@ -10,7 +10,6 @@ def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
         if value < minimum:
             raise ValueError(f"Duration is too short: {value}. (Minimum {minimum})")
         return value
-
     return wrapped_min
 
 
@@ -21,14 +20,14 @@ class ImportConfig(BaseModel):
             alias="BasePath",
             title="BasePath",
             description=dedent("""
-            Mandatory.
-            
-            Specifies the distinguished name ("dn") of the location in the active directory to witch `ManagedUserPath`
-            and `GroupMap` are relative.
-            
-            Usually this will be the `CN=Users` container of the domain, because pre-existing security groups are 
-            located there.
-        """),
+                Mandatory.
+                
+                Specifies the distinguished name ("dn") of the location in the active directory to witch `ManagedUserPath`
+                and `GroupMap` are relative.
+                
+                Usually this will be the `CN=Users` container of the domain, because pre-existing security groups are 
+                located there.
+            """),
             examples=["CN=Users,DC=ad,DC=company,DC=com"],
         ),
     ]
@@ -40,17 +39,17 @@ class ImportConfig(BaseModel):
             alias="ManagedUserPath",
             title="ManagedUserPath",
             description=dedent("""
-            Optional (but recommended).
-
-            Specifies the location (relative to `BasePath`) new Active Directory user objects are created.
-            
-            The default value is `CN=P3KI Managed` and is suitable if `BasePath` points to the `CN=Users` folder.
-            The path is relative to `BasePath` and is prepended to form a full dn.
-            UserSync does NOT create this path within the Active Directory, it must be created manually before running
-            any import.
-            
-            *Warning:* This path MUST NOT contain any non-managed users otherwise these accounts will be _DEACTIVATED_.   
-        """),
+                Optional (but recommended).
+    
+                Specifies the location (relative to `BasePath`) new Active Directory user objects are created.
+                
+                The default value is `CN=P3KI Managed` and is suitable if `BasePath` points to the `CN=Users` folder.
+                The path is relative to `BasePath` and is prepended to form a full dn.
+                UserSync does NOT create this path within the Active Directory, it must be created manually before running
+                any import.
+                
+                *Warning:* This path MUST NOT contain any non-managed users otherwise these accounts will be _DEACTIVATED_.   
+            """),
             examples=["CN=P3KI Managed"],
         ),
     ]
@@ -168,6 +167,7 @@ class ImportConfig(BaseModel):
 
     # Appends the base path to turn a sub_path into a full path (the distinguished name)
     def full_path(self, sub_path: str = "") -> str:
+        # Appends the base path to turn a sub_path into a full path (the distinguished name)
         if len(sub_path) > 0:
             return sub_path + "," + self.base_path
         else:
