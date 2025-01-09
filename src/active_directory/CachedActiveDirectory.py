@@ -28,4 +28,3 @@ class CachedActiveDirectory:
     @lru_cache(maxsize=None)
     def get_container(self, dn: str) -> ADContainer:
         return ADContainer.from_dn(dn)
-

@@ -10,6 +10,7 @@ def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
         if value < minimum:
             raise ValueError(f"Duration is too short: {value}. (Minimum {minimum})")
         return value
+
     return wrapped_min
 
 

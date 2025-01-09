@@ -20,15 +20,11 @@ def import_users(
 ):
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
-        k: active_directory.get_group(config.full_path(v))
-        for k, v in config.group_map.items()
+        k: active_directory.get_group(config.full_path(v)) for k, v in config.group_map.items()
     }
 
     # resolve the config RestrictedGroups form AD
-    restricted_groups = [
-        active_directory.get_group(config.full_path(v))
-        for v in config.restricted_groups
-    ]
+    restricted_groups = [active_directory.get_group(config.full_path(v)) for v in config.restricted_groups]
 
     # Read users form input file
     with open(input_file) as f:
