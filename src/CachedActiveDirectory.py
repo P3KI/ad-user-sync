@@ -1,4 +1,4 @@
-from typing import Dict, Generic, TypeVar, Callable
+from typing import Dict, Generic, TypeVar, Callable, Any, Tuple
 
 from pyad.adcontainer import ADContainer
 from pyad.adgroup import ADGroup
@@ -33,38 +33,50 @@ class ADObjectCache(Generic[K, T]):
             self._cache[key] = value
             return value
         except (com_error, win32Exception) as e:
-            raise ActivedirectoryLoadException(query=key, message=str(e))
+            raise ActiveDirectoryLoadException(message=str(e), query=key, cause=e)
 
 
-class ActivedirectoryLoadException(Exception):
+class ActiveDirectoryLoadException(Exception):
     query: str
     message: str
+    cause: Any
 
-    def __init__(self, query: str, message: str):
+    def __init__(self, message: str, query: str, cause: Any) -> None:
         self.query = query
         self.message = message
+        self.cause = cause
+
+    def __str__(self):
+        return f'{self.message}: {self.query}'
+
+
+def find_single_user(params: Tuple[ADContainer, str]) -> ADUser | None:
+    domain, where = params
+    query = ADQuery()
+    query.execute_query(
+        attributes=["distinguishedName"],
+        where_clause=f"objectClass = 'user' AND {where}",
+        base_dn=domain.dn,
+    )
+    if query.get_row_count() == 0:
+        return None
+
+    dn = query.get_single_result()["distinguishedName"]
+    return ADUser.from_dn(dn)
 
 
 class CachedActiveDirectory:
     _group_cache: ADObjectCache[str, ADGroup]
     _container_cache: ADObjectCache[str, ADContainer]
+    _single_user_cache: ADObjectCache[Tuple[ADContainer, str], ADUser | None]
 
     def __init__(self):
         self._group_cache = ADObjectCache(ADGroup.from_dn)
         self._container_cache = ADObjectCache(ADContainer.from_dn)
+        self._single_user_cache = ADObjectCache(find_single_user)
 
     def find_single_user(self, domain: ADContainer, where: str) -> ADUser | None:
-        query = ADQuery()
-        query.execute_query(
-            attributes=["distinguishedName"],
-            where_clause=f"objectClass = 'user' AND {where}",
-            base_dn=domain.dn,
-        )
-        if query.get_row_count() == 0:
-            return None
-
-        dn = query.get_single_result()["distinguishedName"]
-        return ADUser.from_dn(dn)
+        return self._single_user_cache.get((domain, where))
 
     def get_group(self, dn: str) -> ADGroup:
         return self._group_cache.get(dn)
