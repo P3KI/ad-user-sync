@@ -33,7 +33,7 @@ def import_users(
     with open(input_file) as f:
         users_attributes: List[Dict[str, Any]] = json.load(f)
 
-    print("Users:", users_attributes)
+    print(f"Users: {users_attributes}")
 
     # load resolutions of conflicts
     resolutions = resolutions or Resolutions()
@@ -66,7 +66,7 @@ def import_users(
                     enable=False,
                     optional_attributes=user_attributes | {"sAMAccountName": account_name},
                 )
-                print(f"Created user: {cn}")
+                print(f'User "{user}": Created')
             except CatchableADExceptions:
                 conflict_user = active_directory.find_single_user(
                     domain=user_container.get_domain(),
@@ -84,7 +84,7 @@ def import_users(
                     raise
         else:
             user.update_attributes(user_attributes)
-            print(f"Updated user: {cn}")
+            print(f'User "{user}": Updated attributes')
 
         ###
         # Handle special attributes that can not be set via update_attributes, because they require custom logic.
@@ -124,8 +124,9 @@ def import_users(
         removed_members = old_members - new_members
 
         if len(removed_members) > 0:
-            print(f"Removing users from group '{group.cn}': {removed_members}")
             group.remove_members(removed_members)
+            for user in removed_members:
+                print(f'User "{user}": Removed from group "{group.cn}"')
 
         if group not in restricted_groups:
             added_members = new_members - old_members
@@ -138,17 +139,18 @@ def import_users(
                 elif resolution is True:
                     added_members.append(user)
                 else:
-                    print(f"Join group '{group.cn}' denied for user {user}")
+                    print(f'User "{user}": Denied joining group "{group.cn}"')
 
         if len(added_members) > 0:
             group.add_members(added_members)
-            print(f"Added users to group '{group.cn}': {added_members}")
+            for user in added_members:
+                print(f'User "{user}": Joined group "{group.cn}"')
 
     # Managed users currently in AD
     old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
     removed_users = old_users - new_users
     for user in removed_users:
-        print(f"Disabling user: {user.cn} (no longer in import list)")
+        print(f'User "{user}": Disabled (no longer in import list)')
         user.disable()
 
     return actions
