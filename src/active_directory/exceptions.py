@@ -1,4 +1,3 @@
-from typing import Any
 
 from pyad.pyadexceptions import win32Exception
 

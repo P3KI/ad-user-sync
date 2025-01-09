@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Generic, TypeVar, Annotated, Any, Dict, Tuple, Literal, List
+from typing import TypeVar, Any, Dict, Literal
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel
 
-R = TypeVar('R')
+R = TypeVar("R")
 
 
 class Action(BaseModel, ABC):
@@ -14,18 +14,17 @@ class Action(BaseModel, ABC):
 
 
 class EnableAction(Action):
-    type: Literal['enable'] = 'enable'
+    type: Literal["enable"] = "enable"
     # todo: requires password?
 
 
 class JoinAction(Action):
-    type: Literal['join'] = 'join'
+    type: Literal["join"] = "join"
     group: str
 
 
 class NameAction(Action):
-    type: Literal['name'] = 'name'
+    type: Literal["name"] = "name"
     name: str
     conflict_user: str
     attributes: Dict[str, Any]
-

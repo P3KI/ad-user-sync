@@ -1,4 +1,3 @@
-import sys
 import json
 from datetime import datetime
 from typing import Dict, List, Any, Set
@@ -73,12 +72,14 @@ def import_users(
                     where=f"sAMAccountName = '{account_name}'",
                 )
                 if conflict_user:
-                    actions.append(NameAction(
-                        user=cn,
-                        attributes=user_attributes,
-                        account_name=account_name,
-                        conflict_user=conflict_user.cn,
-                    ))
+                    actions.append(
+                        NameAction(
+                            user=cn,
+                            attributes=user_attributes,
+                            account_name=account_name,
+                            conflict_user=conflict_user.cn,
+                        )
+                    )
                     continue
                 else:
                     raise
