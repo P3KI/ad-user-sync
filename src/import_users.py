@@ -6,22 +6,25 @@ from typing import Dict, List, Any, Set
 from pyad.adgroup import ADGroup
 from pyad.aduser import ADUser
 
-
-from src import InteractiveImport
 from src.active_directory import CatchableADExceptions
 from src.active_directory.CachedActiveDirectory import CachedActiveDirectory
 from src.model import ImportConfig
+from src.model.Action import Action, NameAction, EnableAction, JoinAction
+from src.model.Resolution import Resolutions
 
 
 def import_users(
     config: ImportConfig,
     input_file: str,
     active_directory: CachedActiveDirectory,
-):
+    resolutions: Resolutions = None,
+) -> List[Action]:
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
         k: active_directory.get_group(config.full_path(v)) for k, v in config.group_map.items()
     }
+    # here we will collect the required interactive actions
+    actions: List[Action] = []
 
     # resolve the config RestrictedGroups form AD
     restricted_groups = [active_directory.get_group(config.full_path(v)) for v in config.restricted_groups]
@@ -32,7 +35,8 @@ def import_users(
 
     print("Users:", users_attributes)
 
-    InteractiveImport.load_resolved(config.pending_actions_file)
+    # load resolutions of conflicts
+    resolutions = resolutions or Resolutions()
 
     # The path where all managed users will be created. Defined by ManagedUserPath
     user_container = active_directory.get_container(config.full_path(config.managed_user_path))
@@ -56,31 +60,31 @@ def import_users(
         # Create user or update user attributes
         user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
         if user is None:
-            print(f"Creating user: {cn}")
             try:
                 user = user_container.create_user(
                     name=cn,
                     enable=False,
                     optional_attributes=user_attributes | {"sAMAccountName": account_name},
                 )
+                print(f"Created user: {cn}")
             except CatchableADExceptions:
                 conflict_user = active_directory.find_single_user(
                     domain=user_container.get_domain(),
                     where=f"sAMAccountName = '{account_name}'",
                 )
                 if conflict_user:
-                    print(f"Action required: User '{cn}' account name conflict: {account_name}")
-                    InteractiveImport.add_action(
-                        InteractiveImport.UserResolveAccountNameConflict(
-                            cn, conflict_user.cn, account_name, user_attributes
-                        )
-                    )
+                    actions.append(NameAction(
+                        user=cn,
+                        attributes=user_attributes,
+                        account_name=account_name,
+                        conflict_user=conflict_user.cn,
+                    ))
                     continue
                 else:
                     raise
         else:
-            print(f"Updating user: {cn}")
             user.update_attributes(user_attributes)
+            print(f"Updated user: {cn}")
 
         ###
         # Handle special attributes that can not be set via update_attributes, because they require custom logic.
@@ -99,8 +103,8 @@ def import_users(
         if disabled:
             user.disable()
         elif user._ldap_adsi_obj.AccountDisabled:
-            print(f"User {user} not automatically enabled.")
-            InteractiveImport.add_action(InteractiveImport.UserEnableAction(user.dn))
+            # todo: requires password?
+            actions.append(EnableAction(user=user.dn))
 
         # Collect group membership
         # We can't set group membership for users, instead we have to set user members for groups
@@ -118,20 +122,27 @@ def import_users(
         old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
 
         removed_members = old_members - new_members
-        added_members = new_members - old_members
 
         if len(removed_members) > 0:
             print(f"Removing users from group '{group.cn}': {removed_members}")
             group.remove_members(removed_members)
 
+        if group not in restricted_groups:
+            added_members = new_members - old_members
+        else:
+            added_members = []
+            for user in new_members - old_members:
+                resolution = resolutions.can_join(user=user.dn, group=group.dn)
+                if resolution is None:
+                    actions.append(JoinAction(user=user.dn, group=group.dn))
+                elif resolution is True:
+                    added_members.append(user)
+                else:
+                    print(f"Join group '{group.cn}' denied for user {user}")
+
         if len(added_members) > 0:
-            if group in restricted_groups:
-                for user in added_members:
-                    print(f"User {user} not automatically adding to restricted group: {group.cn}")
-                    InteractiveImport.add_action(InteractiveImport.UserJoinGroupAction(user.dn, group.dn))
-            else:
-                print(f"Adding users to group '{group.cn}': {added_members}")
-                group.add_members(added_members)
+            group.add_members(added_members)
+            print(f"Added users to group '{group.cn}': {added_members}")
 
     # Managed users currently in AD
     old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
@@ -140,7 +151,4 @@ def import_users(
         print(f"Disabling user: {user.cn} (no longer in import list)")
         user.disable()
 
-    if config.pending_actions_file is not None:
-        if InteractiveImport.any_actions():
-            print(f"Saving required actions to {config.pending_actions_file}")
-        InteractiveImport.save(config.pending_actions_file)  # Save either way
+    return actions
