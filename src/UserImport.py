@@ -1,252 +1,150 @@
 import sys
 import json
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List, Any, Set
 
-from dateutil.relativedelta import relativedelta
-from pyad.adcontainer import ADContainer
 from pyad.adgroup import ADGroup
-from pyad.adquery import ADQuery
 from pyad.aduser import ADUser
-from pyad.pyadexceptions import win32Exception
+
 
 from src import InteractiveImport
+from src.active_directory import CatchableADExceptions
+from src.active_directory.CachedActiveDirectory import CachedActiveDirectory
 from src.model import ImportConfig
 
-try:
-    from pywintypes import com_error
-except ImportError:
-    # todo: try if this works on windows. if yes: get rid of the pywin32 dependency
-    from pyad.pyadexceptions import comException as com_error
 
+def import_users(
+    config: ImportConfig,
+    input_file: str,
+    active_directory: CachedActiveDirectory,
+):
+    # resolve the config GroupMap form AD
+    group_map: Dict[str, ADGroup] = {
+        k: active_directory.get_group(config.full_path(v))
+        for k, v in config.group_map.items()
+    }
 
-# Attributes that can not be applied using ADUser.update_attributes() function, but require special handling
-ATTRIBUTE_BLACKLIST = {
-    "cn",  # Only used during user creation
-    "sAMAccountName",  # Only set during user creation, not updated after wards
-    "memberOf",  # Special handling: "memberOf" attribute of users can not be written, must use "member" attribute of groups.
-    "distinguishedName",  # should not be exported in the first place, since it is domain specific
-    "subPath",  # Currently not used, not a valid AD attribute.
-    "disabled",  # Special handling: We only disable, never enable
-    "accountExpires",  # Special handling: Need to call ADUser.set_expiration() to set it.
-}
+    # resolve the config RestrictedGroups form AD
+    restricted_groups = [
+        active_directory.get_group(config.full_path(v))
+        for v in config.restricted_groups
+    ]
 
+    # Read users form input file
+    with open(input_file) as f:
+        users_attributes: List[Dict[str, Any]] = json.load(f)
 
-# Print error message
-def error(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
+    print("Users:", users_attributes)
 
+    InteractiveImport.load_resolved(config.pending_actions_file)
 
-class UserImporter:
-    _group_cache: Dict[str, ADGroup]
-    config: ImportConfig
-    input_file: str
+    # The path where all managed users will be created. Defined by ManagedUserPath
+    user_container = active_directory.get_container(config.full_path(config.managed_user_path))
 
-    def __init__(self, input_file: str, config: ImportConfig):
-        self._group_cache = {}
-        self.config = config
-        self.input_file = input_file
-        self.user_container = self.get_user_container(config.get("ManagedUserPath", "CN=P3KI Managed"))
-        self.group_map = self.make_group_map(config.get("GroupMap", []))
-        self.restricted_groups = self.make_group_list(config.get("RestrictedGroups", []))
-        self.pending_actions_file = config.get("InteractiveActionsOutput", "Pending.json")
+    # New memberships in all managed groups are collected here.
+    new_group_members: Dict[ADGroup, Set[ADUser]] = {k: set() for k in group_map.values()}
 
-    # Create AD container object from distinguished name.
-    def get_user_container(self, sub_path: str) -> ADContainer:
-        dn = self.config.full_path(sub_path)
-        try:
-            return ADContainer.from_dn(dn)
-        except (com_error, win32Exception) as e:
-            error("Error: Loading managed user path from config failed. Does the path exist in AD?")
-            error(f"    Path entry: ManagedUserPath: {sub_path}")
-            error(f"    Looking for path: {dn}")
-            error(f"    {e}")
-            exit(2)
+    # All users imported during this run
+    new_users: Set[ADUser] = set()
 
-    # Create AD group object from distinguished name. Cached.
-    def resolve_group(self, dn: str) -> ADGroup:
-        group = self._group_cache.get(dn)
-        if group is None:
-            group = ADGroup.from_dn(dn)
-            self._group_cache[dn] = group
-        return group
+    for user_attributes in users_attributes:
+        # Remove attributes that can not be applied using ADUser.update_attributes() function
+        cn: str = config.prefix_account_name(user_attributes.pop("cn"))  # used as key and for user creation
+        account_name: str = config.prefix_account_name(user_attributes.pop("sAMAccountName"))  # used for user creation
+        member_of: List[str] = user_attributes.pop("memberOf")  # will be mapped to "member" attribute of groups
+        account_expires: str | None = user_attributes.pop("accountExpires", None)  # set via ADUser.set_expiration()
+        disabled: bool = user_attributes.pop("disabled", False)  # We only disable via ADUser.disable(), never enable
+        user_attributes.pop("subPath", None)  # Currently not used, not a valid AD attribute.
+        user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
 
-    # Map exported group names to local AD groups
-    def map_groups(self, sub_paths):
-        ret = []
-        for sub_path in sub_paths:
-            mapped = self.group_map.get(sub_path, None)
-            if mapped:
-                ret.append(mapped)
-
-        common = self.group_map.get("*", None)
-        if common is not None:
-            ret.append(common)
-
-        return ret
-
-    # Create a map for all specified sub-paths to local managed AD Groups.
-    def make_group_map(self, group_map):
-        ret = {}
-        for sub_path in group_map.keys():
-            mapped = group_map[sub_path]
+        # Create user or update user attributes
+        user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
+        if user is None:
+            print(f"Creating user: {cn}")
             try:
-                ret[sub_path] = self.resolve_group(self.config.full_path(mapped))
-            except (com_error, win32Exception) as e:
-                error("Error: Failed to load group mapping from configuration. Do all specified groups exist in AD?")
-                error(f"    Failed at mapping entry: {sub_path} : {mapped}")
-                error(f"    Looking for group: {self.config.full_path(mapped)}")
-                error(f"    {e}")
-                exit(1)
-
-        return ret
-
-    # Create a list of ADGroups from all specified sub-paths.
-    def make_group_list(self, group_list):
-        ret = set()
-        for sub_path in group_list:
-            try:
-                ret.add(self.resolve_group(self.config.full_path(sub_path)))
-            except (com_error, win32Exception) as e:
-                error(
-                    "Error: Failed to load restricted groups from configuration. Do all specified groups exist in AD?"
+                user = user_container.create_user(
+                    name=cn,
+                    enable=False,
+                    optional_attributes=user_attributes | {"sAMAccountName": account_name},
                 )
-                error(f"    Failed at group entry: {sub_path}")
-                error(f"    Looking for group: {self.config.full_path(sub_path)}")
-                error(f"    {e}")
-                exit(1)
-
-        return ret
-
-    def find_single_user(self, domain: ADContainer, where: str) -> ADUser | None:
-        query = ADQuery()
-        query.execute_query(
-            attributes=["distinguishedName"],
-            where_clause=f"objectClass = 'user' AND {where}",
-            base_dn=domain.dn,
-        )
-        if query.get_row_count() == 0:
-            return None
-
-        dn = query.get_single_result()["distinguishedName"]
-        return ADUser.from_dn(dn)
-
-    def run(self):
-        # Read users
-        with open(self.input_file) as f:
-            users = json.load(f)
-
-        print("Users:", users)
-
-        InteractiveImport.load_resolved(self.pending_actions_file)
-
-        # Memberships in all managed groups are collected here.
-        group_members = {k: [] for k in self.group_map.values()}
-
-        # Path where all managed users will be created.
-
-        # Managed users currently in AD
-        old_users = self.user_container.get_children(recursive=False, filter=[ADUser])
-
-        # All users imported during this run
-        new_users = set()
-
-        for user in users:
-            parent = self.user_container
-            groups = self.map_groups(user["memberOf"])
-
-            # Apply name prefixes, if configured
-            cn = self.config.prefix_account_name(user["cn"])
-            account_name = self.config.prefix_account_name(user["sAMAccountName"])
-
-            # Extract attribute values, so they can be applied to the target domain.
-            attributes = {k: v for k, v in user.items() if k not in ATTRIBUTE_BLACKLIST}
-
-            # Create user or update user attributes
-            u = self.find_single_user(parent, f"cn = '{cn}'")
-            if u is None:
-                print("Creating user:", cn)
-                try:
-                    u = parent.create_user(
-                        cn,
-                        enable=False,
-                        optional_attributes=(attributes | {"sAMAccountName": account_name}),
-                    )
-                except (com_error, win32Exception) as e:
-                    conflict_user = self.find_single_user(parent.get_domain(), f"sAMAccountName = '{account_name}'")
-                    if conflict_user:
-                        print(f"Failed to create user '{cn}' due to account name already in use: {account_name}")
-                        InteractiveImport.add_action(
-                            InteractiveImport.UserResolveAccountNameConflict(
-                                cn, conflict_user.cn, account_name, attributes
-                            )
+            except CatchableADExceptions:
+                conflict_user = active_directory.find_single_user(
+                    domain=user_container.get_domain(),
+                    where=f"sAMAccountName = '{account_name}'",
+                )
+                if conflict_user:
+                    print(f"Action required: User '{cn}' account name conflict: {account_name}")
+                    InteractiveImport.add_action(
+                        InteractiveImport.UserResolveAccountNameConflict(
+                            cn, conflict_user.cn, account_name, user_attributes
                         )
-                        continue
-                    else:
-                        error(f"Error: Failed to create user '{cn}' with login name '{attributes['sAMAccountName']}'")
-                        error(f"    Does another use with this login name already exists?")
-                        error(f"    {e}")
-                        exit(3)
-            else:
-                print("Updating user:", u.cn)
-                u.update_attributes(attributes)
-
-            ###
-            # Handle special attributes that can not be set via update_attributes, because they require custom logic.
-            ###
-
-            # set expiration to at least the default_expiration
-            expiration_date = self.config.get_default_expiration_date()
-            if user["accountExpires"]:
-                account_expires = datetime.fromisoformat(user["accountExpires"])
-                if account_expires > expiration_date:
-                    expiration_date = account_expires
-            u.set_expiration(expiration_date)
-
-            # If the user should be enabled, but is disabled, add an interactive action for it.
-            # Do not enable automatically.
-            if u._ldap_adsi_obj.AccountDisabled and not user["disabled"]:
-                print(f"User {u} not automatically enabled.")
-                InteractiveImport.add_action(InteractiveImport.UserEnableAction(u.dn))
-
-            if user["disabled"]:
-                u.disable()
-
-            # Collect group membership
-            # We can't set group membership for users, instead we have to set user members for groups
-            for group in groups:
-                group_members[group] += [u]
-
-            # Collect all users from the current import
-            new_users.add(u)
-
-        # Apply memberships to managed groups
-        for group in group_members:
-            old_members = group.get_members(ignore_groups=True)
-            new_members = group_members[group]
-
-            removed_members = [u for u in old_members if u not in new_members]
-            added_members = [u for u in new_members if u not in old_members]
-
-            if len(removed_members) > 0:
-                print(f"Removing users from group '{group.cn}': {removed_members}")
-                group.remove_members(removed_members)
-
-            if len(added_members) > 0:
-                if group in self.restricted_groups:
-                    for u in added_members:
-                        print(f"User {u} not automatically adding to restricted group: {group.cn}")
-                        InteractiveImport.add_action(InteractiveImport.UserJoinGroupAction(u.dn, group.dn))
+                    )
+                    continue
                 else:
-                    print(f"Adding users to group '{group.cn}': {added_members}")
-                    group.add_members(added_members)
+                    raise
+        else:
+            print(f"Updating user: {cn}")
+            user.update_attributes(user_attributes)
 
-        removed_users = [u for u in old_users if u not in new_users]
-        for u in removed_users:
-            print(f"Disabling user: {u.cn} (no longer in import list)")
-            u.disable()
+        ###
+        # Handle special attributes that can not be set via update_attributes, because they require custom logic.
+        ###
 
-        if self.pending_actions_file is not None:
-            if InteractiveImport.any_actions():
-                print(f"Saving action requiring intervention to {self.pending_actions_file}")
-            InteractiveImport.save(self.pending_actions_file)  # Save either way
+        # set expiration to at least the default_expiration
+        expiration_date = config.get_default_expiration_date()
+        if account_expires:
+            account_expires_date = datetime.fromisoformat(account_expires)
+            if account_expires_date > expiration_date:
+                expiration_date = account_expires_date
+        user.set_expiration(expiration_date)
+
+        # If the user should be enabled, but is disabled, add an interactive action for it.
+        # Do not enable automatically.
+        if disabled:
+            user.disable()
+        elif user._ldap_adsi_obj.AccountDisabled:
+            print(f"User {user} not automatically enabled.")
+            InteractiveImport.add_action(InteractiveImport.UserEnableAction(user.dn))
+
+        # Collect group membership
+        # We can't set group membership for users, instead we have to set user members for groups
+        # We do this for all groups of the user that have a mapping for the local AD and also the
+        # GroupMap[*] group if defined.
+        user_groups = map(group_map.get, member_of + ["*"])
+        for user_group in set(filter(lambda g: g is not None, user_groups)):
+            new_group_members[user_group].add(user)
+
+        # Collect all users from the current import
+        new_users.add(user)
+
+    # Apply memberships to managed groups
+    for group, new_members in new_group_members.items():
+        old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
+
+        removed_members = old_members - new_members
+        added_members = new_members - old_members
+
+        if len(removed_members) > 0:
+            print(f"Removing users from group '{group.cn}': {removed_members}")
+            group.remove_members(removed_members)
+
+        if len(added_members) > 0:
+            if group in restricted_groups:
+                for user in added_members:
+                    print(f"User {user} not automatically adding to restricted group: {group.cn}")
+                    InteractiveImport.add_action(InteractiveImport.UserJoinGroupAction(user.dn, group.dn))
+            else:
+                print(f"Adding users to group '{group.cn}': {added_members}")
+                group.add_members(added_members)
+
+    # Managed users currently in AD
+    old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
+    removed_users = old_users - new_users
+    for user in removed_users:
+        print(f"Disabling user: {user.cn} (no longer in import list)")
+        user.disable()
+
+    if config.pending_actions_file is not None:
+        if InteractiveImport.any_actions():
+            print(f"Saving required actions to {config.pending_actions_file}")
+        InteractiveImport.save(config.pending_actions_file)  # Save either way

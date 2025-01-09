@@ -165,7 +165,6 @@ class ImportConfig(BaseModel):
         ),
     ]
 
-    # Appends the base path to turn a sub_path into a full path (the distinguished name)
     def full_path(self, sub_path: str = "") -> str:
         # Appends the base path to turn a sub_path into a full path (the distinguished name)
         if len(sub_path) > 0:
