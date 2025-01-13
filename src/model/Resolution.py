@@ -38,6 +38,28 @@ class Resolutions(RootModel[List[Resolution]]):
     def __len__(self) -> int:
         return len(self.root)
 
+    def get_join(self, user: str, group: str) -> JoinResolution | None:
+        # get the last join resolution for this user and group
+        resolutions = reversed(self.root)
+        resolutions = filter(lambda r: isinstance(r, JoinResolution), resolutions)
+        resolutions = filter(lambda r: r.user == user, resolutions)
+        resolutions = filter(lambda r: r.group == group, resolutions)
+        return next(resolutions, None)
+
+    def get_enable(self, user: str) -> EnableResolution | None:
+        # get the latest enable resolution for this user
+        resolutions = reversed(self.root)
+        resolutions = filter(lambda r: isinstance(r, EnableResolution), resolutions)
+        resolutions = filter(lambda r: r.user == user, resolutions)
+        return next(resolutions, None)
+
+    def get_name(self, user: str) -> NameResolution | None:
+        # get the latest name resolution for this user
+        resolutions = reversed(self.root)
+        resolutions = filter(lambda r: isinstance(r, NameResolution), resolutions)
+        resolutions = filter(lambda r: r.user == user, resolutions)
+        return next(resolutions, None)
+
     @classmethod
     def load(cls, file: str) -> Resolutions:
         with open(file, "r") as f:
