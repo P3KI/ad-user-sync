@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "A tool to export users from a Windows Active Directory and import them into another."
 authors = ["Philipp Claves <philipp@p3ki.com>", "Felix Hofmann <felix.hofmann@fxhm.de>"]
 readme = "README.md"
+package-mode = false
+
 
 [tool.poetry.dependencies]
 python = "^3.12"
