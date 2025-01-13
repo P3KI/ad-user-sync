@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Generic, TypeVar, Annotated, Literal, List
+from typing import Generic, TypeVar, Annotated, Literal, List, Iterable, Type
 
 from pydantic import BaseModel, Field, RootModel
 
@@ -9,56 +9,59 @@ from pydantic import BaseModel, Field, RootModel
 T = TypeVar("T")
 
 
-class BaseResolution(BaseModel, Generic[T], ABC):
+class BaseResolution(BaseModel, ABC):
     type: str
     user: str
-    value: T
+    accept: Annotated[bool | None, Field(default=None)]
+
+    @property
+    def is_resolved(self) -> bool:
+        return self.accept is not None
 
 
-class EnableResolution(BaseResolution[bool]):
+class EnableResolution(BaseResolution):
     type: Literal["enable"] = "enable"
-    password: Annotated[str, Field(default=None, exclude=True)]
+    password: Annotated[str | None, Field(default="", exclude=True)]
 
 
-class JoinResolution(BaseResolution[bool]):
+class JoinResolution(BaseResolution):
     type: Literal["join"] = "join"
     group: str
 
 
-class NameResolution(BaseResolution[str]):
+class NameResolution(BaseResolution):
     type: Literal["name"] = "name"
+    name: Annotated[str | None, Field(default="", exclude=True)]
 
 
 Resolution = Annotated[EnableResolution | JoinResolution | NameResolution, Field(discriminator="type")]
 
 
 class Resolutions(RootModel[List[Resolution]]):
+
     root: Annotated[List[Resolution], Field(default_factory=list)]
 
     def __len__(self) -> int:
         return len(self.root)
 
+    def _filter(self, cls: Type[Resolution], user: str) -> Iterable[Resolution]:
+        resolutions = reversed(self.root)
+        resolutions = filter(lambda r: isinstance(r, cls), resolutions)
+        resolutions = filter(lambda r: r.is_resolved, resolutions)
+        return filter(lambda r: r.user == user, resolutions)
+
     def get_join(self, user: str, group: str) -> JoinResolution | None:
         # get the last join resolution for this user and group
-        resolutions = reversed(self.root)
-        resolutions = filter(lambda r: isinstance(r, JoinResolution), resolutions)
-        resolutions = filter(lambda r: r.user == user, resolutions)
-        resolutions = filter(lambda r: r.group == group, resolutions)
+        resolutions = filter(lambda r: r.group == group, self._filter(JoinResolution, user))
         return next(resolutions, None)
 
     def get_enable(self, user: str) -> EnableResolution | None:
         # get the latest enable resolution for this user
-        resolutions = reversed(self.root)
-        resolutions = filter(lambda r: isinstance(r, EnableResolution), resolutions)
-        resolutions = filter(lambda r: r.user == user, resolutions)
-        return next(resolutions, None)
+        return next(self._filter(EnableResolution, user), None)
 
     def get_name(self, user: str) -> NameResolution | None:
         # get the latest name resolution for this user
-        resolutions = reversed(self.root)
-        resolutions = filter(lambda r: isinstance(r, NameResolution), resolutions)
-        resolutions = filter(lambda r: r.user == user, resolutions)
-        return next(resolutions, None)
+        return next(self._filter(NameResolution, user), None)
 
     @classmethod
     def load(cls, file: str) -> Resolutions:
