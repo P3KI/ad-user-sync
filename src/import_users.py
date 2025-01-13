@@ -2,14 +2,10 @@ import json
 from datetime import datetime
 from typing import Dict, List, Any, Set
 
-from pyad.adgroup import ADGroup
-from pyad.aduser import ADUser
+from pyad import ADGroup, ADUser
 
-from src.active_directory import CatchableADExceptions
-from src.active_directory.CachedActiveDirectory import CachedActiveDirectory
-from src.model import ImportConfig
-from src.model.Action import Action, NameAction, EnableAction, JoinAction
-from src.model.Resolution import Resolutions
+from .active_directory import CatchableADExceptions, CachedActiveDirectory
+from .model import ImportConfig, Resolutions, Action, NameAction, EnableAction, JoinAction
 
 
 def import_users(
@@ -18,10 +14,12 @@ def import_users(
     active_directory: CachedActiveDirectory,
     resolutions: Resolutions = None,
 ) -> List[Action]:
+
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
         k: active_directory.get_group(config.full_path(v)) for k, v in config.group_map.items()
     }
+
     # here we will collect the required interactive actions
     actions: List[Action] = []
 
@@ -59,6 +57,12 @@ def import_users(
         # Create user or update user attributes
         user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
         if user is None:
+            # check if there should be a renaming applied for this user
+            name_resolution = resolutions.get_name(cn)
+            if name_resolution is not None and name_resolution.accept is True and len(name_resolution.name) > 0:
+                account_name = name_resolution.name
+
+            # create a new user
             try:
                 user = user_container.create_user(
                     name=cn,
@@ -67,25 +71,32 @@ def import_users(
                 )
                 print(f'User "{user}": Created')
             except CatchableADExceptions:
+                # creation failed. check if it was because of a name conflict
                 conflict_user = active_directory.find_single_user(
                     domain=user_container.get_domain(),
                     where=f"sAMAccountName = '{account_name}'",
                 )
                 if conflict_user:
+                    # name conflict detected -> add require action
                     actions.append(
                         NameAction(
                             user=cn,
                             attributes=user_attributes,
-                            account_name=account_name,
+                            name=account_name,
                             conflict_user=conflict_user.cn,
                         )
                     )
+                    # continue with next user to import
                     continue
                 else:
+                    # it was another problem. re-raise exception
                     raise
         else:
-            user.update_attributes(user_attributes)
-            print(f'User "{user}": Updated attributes')
+            # update the attributes of existing user
+            old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
+            if user_attributes != old_attributes:
+                user.update_attributes(user_attributes)
+                print(f'User "{user}": Updated attributes')
 
         ###
         # Handle special attributes that can not be set via update_attributes, because they require custom logic.
@@ -104,8 +115,18 @@ def import_users(
         if disabled:
             user.disable()
         elif user._ldap_adsi_obj.AccountDisabled:
-            # todo: requires password?
-            actions.append(EnableAction(user=user.dn))
+            enable_resolution = resolutions.get_enable(user.dn)
+            if enable_resolution is None:
+                actions.append(EnableAction(user=user.dn))
+            elif enable_resolution.accept is True:
+                if len(enable_resolution.password):
+                    user.set_password(enable_resolution.password)
+                    user.enable()
+                else:
+                    print(f'User "{user}": Activation requires password')
+                    actions.append(EnableAction(user=user.dn))
+            else:
+                print(f'User "{user}": Denied activation')
 
         # Collect group membership
         # We can't set group membership for users, instead we have to set user members for groups
@@ -134,10 +155,10 @@ def import_users(
         else:
             added_members = []
             for user in new_members - old_members:
-                resolution = resolutions.can_join(user=user.dn, group=group.dn)
-                if resolution is None:
+                join_resolution = resolutions.get_join(user=user.dn, group=group.dn)
+                if join_resolution is None:
                     actions.append(JoinAction(user=user.dn, group=group.dn))
-                elif resolution is True:
+                elif join_resolution.accept is True:
                     added_members.append(user)
                 else:
                     print(f'User "{user}": Denied joining group "{group.cn}"')
