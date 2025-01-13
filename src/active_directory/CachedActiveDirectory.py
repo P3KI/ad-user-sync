@@ -15,7 +15,7 @@ class CachedActiveDirectory:
             where_clause=f"objectClass = 'user' AND {where}",
             base_dn=domain.dn,
         )
-        if query.get_row_count() == 0:
+        if len(query) == 0:
             return None
 
         dn = query.get_single_result()["distinguishedName"]
