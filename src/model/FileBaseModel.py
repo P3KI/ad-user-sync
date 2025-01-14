@@ -21,9 +21,9 @@ class FileBaseModel(BaseModel):
                         logger.error(format_validation_error(e, source=str(file)))
                         raise
                 else:
-                    logger.warning(f"File {file} is empty. Continue with default {cls}.")
+                    logger.warning(f"File {file} is empty. Continue with default {cls.__name__}.")
         else:
-            logger.warning(f"File {file} does not exist. Continue with default {cls}.")
+            logger.warning(f"File {file} does not exist. Continue with default {cls.__name__}.")
         return cls()
 
     def save(self, file: str) -> None:
