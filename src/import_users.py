@@ -1,16 +1,19 @@
 import json
 from datetime import datetime
-from typing import Dict, List, Any, Set
+from logging import Logger
+from typing import Dict, List, Any, Set, Iterable
 
 from pyad import ADGroup, ADUser
 
 from .active_directory import CatchableADExceptions, CachedActiveDirectory
 from .model import ImportConfig, Resolutions, Action, NameAction, EnableAction, JoinAction
+from .util import not_none
 
 
 def import_users(
     config: ImportConfig,
     input_file: str,
+    logger: Logger,
     resolutions: Resolutions = None,
 ) -> List[Action]:
     active_directory = CachedActiveDirectory()
@@ -30,7 +33,8 @@ def import_users(
     with open(input_file) as f:
         users_attributes: List[Dict[str, Any]] = json.load(f)
 
-    print(f"Users: {users_attributes}")
+    if config.log_input_file_content:
+        logger.info(f"Input: {json.dumps(users_attributes)}")
 
     # load resolutions of conflicts
     resolutions = resolutions or Resolutions()
@@ -40,10 +44,10 @@ def import_users(
 
     # All users imported during this run
     old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
-    new_users: Set[ADUser] = set()
+    current_users: Set[ADUser] = set()  # list of users that are present in the current import list
 
-    # New memberships in all managed groups are collected here.
-    new_group_members: Dict[ADGroup, Set[ADUser]] = {k: set() for k in group_map.values()}
+    # User memberships for all managed groups are collected here
+    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in group_map.values()}
 
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
@@ -70,7 +74,7 @@ def import_users(
                     enable=False,
                     optional_attributes=user_attributes | {"sAMAccountName": account_name},
                 )
-                print(f"{user}: Created")
+                logger.info(f"{user}: Was created")
             except CatchableADExceptions:
                 # creation failed. check if it was because of a name conflict
                 conflict_user = active_directory.find_single_user(
@@ -78,7 +82,7 @@ def import_users(
                     where=f"sAMAccountName = '{account_name}'",
                 )
                 if conflict_user:
-                    # name conflict detected -> add require action
+                    # name conflict detected -> add required action
                     actions.append(
                         NameAction(
                             user=cn,
@@ -97,82 +101,101 @@ def import_users(
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
             if user_attributes != old_attributes:
                 user.update_attributes(user_attributes)
-                print(f"{user}: Updated attributes")
+                logger.info(f"{user}: Attributes were updated")
 
-        ###
-        # Handle special attributes that can not be set via update_attributes, because they require custom logic.
-        ###
+        # add the user to the list of users, present in the current import list
+        current_users.add(user)
 
-        # set expiration to at least the default_expiration
-        expiration_date = config.get_default_expiration_date()
+        # Set expiration
+        expiration_date = config.get_default_expiration_date()  # has to be at least the default_expiration
         if account_expires:
+            # if `accountExpires` from the input file is longer, apply that instead
             account_expires_date = datetime.fromisoformat(account_expires)
             if account_expires_date > expiration_date:
                 expiration_date = account_expires_date
         user.set_expiration(expiration_date)
 
-        # If the user should be enabled, but is disabled, add an interactive action for it.
-        # Do not enable automatically.
-        if disabled:
+        # Enable/Disable the User
+        existing_user_is_disabled = user._ldap_adsi_obj.AccountDisabled
+        if disabled and not existing_user_is_disabled:
+            # enabled existing user should be disabled
             user.disable()
-        elif user._ldap_adsi_obj.AccountDisabled:
+            logger.info(f"{user}: Was disabled (disabled attribute set in input file)")
+        elif existing_user_is_disabled:
+            # enabling a disabled existing user requires a resolved interactive action
+            # we do not enable automatically
             enable_resolution = resolutions.get_enable(user.dn)
             if enable_resolution is None:
+                # no resolved action was found -> add interactive action
                 actions.append(EnableAction(user=user.dn))
             elif enable_resolution.accept is True:
-                if len(enable_resolution.password):
-                    user.set_password(enable_resolution.password)
-                    user.enable()
-                else:
-                    print(f"{user}: Activation requires password")
-                    actions.append(EnableAction(user=user.dn))
+                # resolved action was found and it got accepted
+                # todo handle password requirements error
+                user.set_password(enable_resolution.password)
+                user.enable()
+                logger.info(f"{user}: Was enabled (accepted manually)")
             else:
-                print(f"{user}: User activation was rejected manually ({enable_resolution.timestamp})")
+                # resolved action was found and it got rejected
+                logger.info(f"{user}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
 
-        # Collect group membership
-        # We can't set group membership for users, instead we have to set user members for groups
-        # We do this for all groups of the user that have a mapping for the local AD and also the
-        # GroupMap[*] group if defined.
-        user_groups = map(group_map.get, member_of + ["*"])
-        for user_group in set(filter(lambda g: g is not None, user_groups)):
-            new_group_members[user_group].add(user)
+        # Add user as a member to managed groups for later processing
+        # We can't set group membership fora user directly, instead we have to set user members for groups.
+        #   1. Add "*" to `member_of` of the user to also map the catch-all group.
+        #   2. Map all given groups to local AD groups according to group_map (unmapped groups will be None).
+        #   3. Filter out unmapped groups (`None` values).
+        #   4. Remove duplicates by collecting groups in a set.
+        # Then add the user as a member to every group.
+        for user_group in set(filter(not_none, map(group_map.get, member_of + ["*"]))):
+            current_members_by_group[user_group].add(user)
 
-        # Collect all users from the current import
-        new_users.add(user)
-
-    # Apply memberships to managed groups
-    for group, new_members in new_group_members.items():
+    # Update memberships of managed groups
+    for group, current_group_members in current_members_by_group.items():
         old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
 
-        removed_members = old_members - new_members
+        removed_members = old_members - current_group_members
 
         if len(removed_members) > 0:
             group.remove_members(removed_members)
             for user in removed_members:
-                print(f'{user}: Removed from group "{group.cn}"')
+                logger.info(f'{user}: Removed from group "{group.cn}" (membership not present in import list)')
 
+        # add members to group that haven't been members before
         if group not in restricted_groups:
-            added_members = new_members - old_members
+            # unrestricted groups can just be joined
+            new_members = current_group_members - old_members
+            if len(new_members) > 0:
+                group.add_members(new_members)
+                for user in new_members:
+                    logger.info(f'{user}: Joined group "{group.cn}"')
         else:
-            added_members = []
-            for user in new_members - old_members:
+            # joining a restricted group requires a resolved interactive action
+            new_members = []
+
+            # filter the users that are accepted in the restricted group
+            for user in current_group_members - old_members:
+                # see if there is a resolved action
                 join_resolution = resolutions.get_join(user=user.dn, group=group.dn)
                 if join_resolution is None:
+                    # no resolved action was found  -> add interactive action
                     actions.append(JoinAction(user=user.dn, group=group.dn))
                 elif join_resolution.accept is True:
-                    added_members.append(user)
+                    # resolved action was found and it was accepted
+                    new_members.append(user)
+                    logger.info(f'{user}: Not joining group "{group.cn}" (rejected manually at {join_resolution.timestamp})')
                 else:
-                    print(f'{user}: Joining group "{group.cn}" rejected manually ({join_resolution.timestamp})')
+                    # resolved action was found and it was rejected
+                    logger.info(f'{user}: Not joining restricted group "{group.cn}" (rejected manually at {join_resolution.timestamp})')
 
-        if len(added_members) > 0:
-            group.add_members(added_members)
-            for user in added_members:
-                print(f'{user}: Joined group "{group.cn}"')
+            # add the approved members to the group
+            if len(new_members) > 0:
+                group.add_members(new_members)
+                for user in new_members:
+                    logger.info(f'{user}: Joined restricted group "{group.cn}" (accepted manually)')
 
-    # Managed users currently in AD
-    removed_users = old_users - new_users
+    # Disable users currently in AD but not in current import list
+    removed_users = old_users - current_users
     for user in removed_users:
-        print(f"{user}: Disabled (no longer in import list)")
         user.disable()
+        logger.info(f"{user}: Was disabled (user no longer in import list)")
 
     return actions
