@@ -1,0 +1,154 @@
+
+{% macro dict_table(data) %}
+  <table style="margin: -1px;">
+    <tbody>
+      {% for key, value in data.items() %}
+      {% if value != None %}
+        <tr>
+          <td>{{ key }}</td>
+          <td>
+            {% if value is mapping %}
+              {{ dict_table(value, table_class, indent_level + 1) }}
+            {% else %}
+              {{ value }}
+            {% endif %}
+          </td>
+        </tr>
+      {% endif %}
+      {% endfor %}
+    </tbody>
+  </table>
+{% endmacro %}
+
+{% set type_descriptions = {
+    'enable': 'Enable User',
+    'join': 'Join Group',
+    'name': 'Name Conflict',
+} %}
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>AD Permission Sync</title>
+    <style>
+        body {
+            font-family: monospace;
+        }
+        table, tr {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        td {
+          border-collapse: collapse;
+          border: 1px solid black;
+        }
+        .action-table {
+            margin-bottom: 20px;
+        }
+        td {
+            padding: 6px;
+        }
+    </style>
+</head>
+<body>
+    <form id="form" method="post">
+    <table class="action-table">
+        {% for action in actions %}
+            {% set idx = loop.index0 %}
+                <tbody>
+                    <tr style="font-weight: bold;">
+                        <td colspan="2">
+                            {{ type_descriptions[action.type] }}
+                            <input type="hidden" name="{{idx}}.type" value="{{action.type}}">
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>User</td>
+                        <td>
+                            {{ action.user }}
+                            <input type="hidden" name="{{idx}}.user" value="{{action.user}}">
+                        </td>
+                    </tr>
+                    {% if action.type == 'join' %}
+                        <tr>
+                            <td>Group</td>
+                            <td>
+                                {{ action.group }}
+                                <input type="hidden" name="{{idx}}.group" value="{{action.group}}">
+                            </td>
+                        </tr>
+                    {% elif action.type == 'name' %}
+                        <tr>
+                            <td>User Attributes</td>
+                            <td style="padding: 0;">{{dict_table(action.attributes)}}</td>
+                        </tr>
+                        <tr>
+                            <td>Conflict User</td>
+                            <td>{{action.conflict_user}}</td>
+                        </tr>
+                    {% endif %}
+
+                    <tr>
+                        <td>Action</td>
+                        <td>
+                            <label>
+                                <input class="accept-radio" type="radio" name="{{idx}}.accept" value="true"> Accept
+                            </label>
+                            <label>
+                                <input class="accept-radio" type="radio" name="{{idx}}.accept" value="false"> Reject
+                            </label>
+                        </td>
+                    </tr>
+
+                    {% if action.type == 'enable' %}
+                        <tr>
+                            <td>Password</td>
+                            <td>
+                                <input
+                                    class="disable-for-{{idx}}.accept"
+                                    type="text"
+                                    name="{{idx}}.password"
+                                    disabled
+                                />
+                            </td>
+                        </tr>
+                    {% elif action.type == 'name' %}
+                        <tr>
+                            <td>New Name</td>
+                            <td>
+                                <input
+                                    class="disable-for-{{idx}}.accept"
+                                    type="text"
+                                    name="{{idx}}.name"
+                                    disabled
+                                />
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                <tr>
+                    <td style="border: none;"> </td>
+                </tr>
+        {% endfor %}
+        </table>
+        <input type="submit" value="Submit">
+    </form>
+
+    <script>
+        for (const radio of document.getElementsByClassName('accept-radio')) {
+            radio.addEventListener('change', (e) => {
+                const disabled = e.target.value === 'false'
+                for (const input of document.getElementsByClassName('disable-for-' + e.target.name)) {
+                    input.disabled = disabled
+                    input.required = !disabled
+                }
+            })
+        }
+    </script>
+</body>
+</html>
