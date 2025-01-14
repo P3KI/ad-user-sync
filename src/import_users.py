@@ -6,16 +6,19 @@ from typing import Dict, List, Any, Set
 from pyad import ADGroup, ADUser
 
 from .active_directory import CatchableADExceptions, CachedActiveDirectory
-from .model import ImportConfig, Resolutions, Action, NameAction, EnableAction, JoinAction
+from .model import ImportConfig, ResolutionList, Action, NameAction, EnableAction, JoinAction
 from .util import not_none
 
 
 def import_users(
     config: ImportConfig,
-    input_file: str,
     logger: Logger,
-    resolutions: Resolutions = None,
+    resolutions: ResolutionList = None,
 ) -> List[Action]:
+    # create an empty resolution list if none is provided
+    resolutions = resolutions or ResolutionList()
+
+    # create a cached active directory instance for accessing AD
     active_directory = CachedActiveDirectory()
 
     # resolve the config GroupMap form AD
@@ -35,9 +38,6 @@ def import_users(
 
     if config.log_input_file_content:
         logger.info(f"Input: {json.dumps(users_attributes)}")
-
-    # load resolutions of conflicts
-    resolutions = resolutions or Resolutions()
 
     # The path where all managed users will be created. Defined by ManagedUserPath
     user_container = active_directory.get_container(config.full_path(config.managed_user_path))

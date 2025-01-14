@@ -48,14 +48,14 @@ Resolution = Annotated[EnableResolution | JoinResolution | NameResolution, Field
 R = TypeVar("R", bound=Resolution)
 
 
-class Resolutions(FileBaseModel):
+class ResolutionList(FileBaseModel):
     resolutions: Annotated[List[Resolution], Field(default_factory=list)]
 
     def __len__(self) -> int:
         return len(self.resolutions)
 
-    def __add__(self, other: Resolutions) -> Resolutions:
-        return Resolutions(resolutions=self.resolutions + other.resolutions)
+    def __add__(self, other: ResolutionList) -> ResolutionList:
+        return ResolutionList(resolutions=self.resolutions + other.resolutions)
 
     def _filter[R](self, cls: Type[R], user: str) -> Iterable[R]:
         resolutions = reversed(self.resolutions)
@@ -76,5 +76,5 @@ class Resolutions(FileBaseModel):
         # get the latest name resolution for this user
         return next(self._filter(NameResolution, user), None)
 
-    def get_rejected(self) -> Resolutions:
-        return Resolutions(resolutions=list(filter(lambda r: r.is_rejected, self.resolutions)))
+    def get_rejected(self) -> ResolutionList:
+        return ResolutionList(resolutions=list(filter(lambda r: r.is_rejected, self.resolutions)))

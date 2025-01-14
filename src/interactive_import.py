@@ -4,7 +4,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from . import ImportConfig, import_users, CatchableADExceptions
-from .model import Resolutions
+from .model import ResolutionList
 
 from bottle import route, run, jinja2_template, post, request
 import bottle
@@ -25,8 +25,7 @@ def interactive_import(
         try:
             actions = import_users(
                 config=config,
-                input_file=input_file,
-                resolutions=Resolutions.load(config.rejected_actions, logger=logger),
+                resolutions=ResolutionList.load(config.rejected_actions, logger=logger),
                 logger=logger.getChild("import_users"),
             )
             return jinja2_template("resolve.html.jinja", actions=actions)
@@ -44,14 +43,14 @@ def interactive_import(
             resolution_props_by_idx.setdefault(idx, {})[prop] = val
         resolution_props = list(map(lambda x: x[1], sorted(resolution_props_by_idx.items())))
         try:
-            new_resolutions = Resolutions(resolutions=resolution_props)
+            new_resolutions = ResolutionList(resolutions=resolution_props)
         except ValidationError as e:
             error_msg = format_validation_error(e, source="HTTP POST Form Data")
             logger.error(error_msg)
             return jinja2_template("error.html.jinja", err=error_msg)
 
         # append new resolutions to existing
-        resolutions = Resolutions.load(config.rejected_actions, logger=logger) + new_resolutions
+        resolutions = ResolutionList.load(config.rejected_actions, logger=logger) + new_resolutions
 
         # save rejections
         resolutions.get_rejected().save(config.rejected_actions)
