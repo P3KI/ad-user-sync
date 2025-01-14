@@ -53,13 +53,16 @@
         td {
             padding: 6px;
         }
+        .enable-password-input {
+            width: 300px;
+        }
     </style>
 </head>
 <body>
-    <form id="form" method="post">
     <table class="action-table">
         {% for action in actions %}
             {% set idx = loop.index0 %}
+            <form id="form" method="post">
                 <tbody>
                     <tr style="font-weight: bold;">
                         <td colspan="2">
@@ -79,7 +82,7 @@
                             <td>Group</td>
                             <td>
                                 {{ action.group }}
-                                <input type="hidden" name="{{idx}}.group" value="{{action.group}}">
+                                <input type="hidden" name="{{idx}}.group" value="{{action.group}}" />
                             </td>
                         </tr>
                     {% elif action.type == 'name' %}
@@ -96,7 +99,12 @@
                             <td>Conflict Account Name</td>
                             <td>
                                 {{ action.name }}
-                                <input type="hidden" name="{{idx}}.name" value="{{action.name}}">
+                                <input
+                                    type="hidden"
+                                    id="{{idx}}.name"
+                                    name="{{idx}}.name"
+                                    value="{{action.name}}"
+                                />
                             </td>
                         </tr>
                     {% endif %}
@@ -104,60 +112,121 @@
                     <tr>
                         <td>Action</td>
                         <td>
-                            <label>
-                                <input class="accept-radio" type="radio" name="{{idx}}.accept" value="true"> Accept
-                            </label>
-                            <label>
-                                <input class="accept-radio" type="radio" name="{{idx}}.accept" value="false"> Reject
-                            </label>
+                            {% if action.type == 'enable' %}
+                                <label for="{{idx}}.password">Password</label>
+                                <input
+                                    class="enable-password-input"
+                                    type="password"
+                                    id="{{idx}}.password"
+                                    name="{{idx}}.password"
+                                />
+                                <button
+                                    class="show-password-button"
+                                    id="{{idx}}.show"
+                                    type="button"
+                                >👁</button>
+                                <button
+                                    class="generate-password-button"
+                                    id="{{idx}}.generate"
+                                    type="button"
+                                >🗘</button>
+                            {% elif action.type == 'name' %}
+                                <label for="{{idx}}.new_name">New Name</label>
+                                <input
+                                    class="name-new_name-input"
+                                    type="text"
+                                    id="{{idx}}.new_name"
+                                    name="{{idx}}.new_name"
+                                    value="{{action.name}}"
+                                />
+                            {% endif %}
+                            <div style="margin-top: 8px;">
+                                <button
+                                    id="{{idx}}-accept-button"
+                                    type="submit"
+                                    name="{{idx}}.accept"
+                                    value="true"
+                                >Accept</button>
+                                <button
+                                    id="{{idx}}-reject-button"
+                                    type="submit"
+                                    name="{{idx}}.accept"
+                                    value="false"
+                                >Reject</button>
+                            </div>
                         </td>
                     </tr>
 
-                    {% if action.type == 'enable' %}
-                        <tr>
-                            <td>Password</td>
-                            <td>
-                                <input
-                                    class="disable-for-{{idx}}.accept"
-                                    type="text"
-                                    name="{{idx}}.password"
-                                    disabled
-                                />
-                            </td>
-                        </tr>
-                    {% elif action.type == 'name' %}
-                        <tr>
-                            <td>New Name</td>
-                            <td>
-                                <input
-                                    class="disable-for-{{idx}}.accept"
-                                    type="text"
-                                    name="{{idx}}.name"
-                                    value="{{action.name}}"
-                                    disabled
-                                />
-                            </td>
-                        </tr>
-                    {% endif %}
                 </tbody>
-                <tr>
-                    <td style="border: none;"> </td>
-                </tr>
+            </form>
+            <tr>
+                <td style="border: none;"> </td>
+            </tr>
         {% endfor %}
         </table>
-        <input type="submit" value="Submit">
-    </form>
 
+    <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
-        for (const radio of document.getElementsByClassName('accept-radio')) {
-            radio.addEventListener('change', (e) => {
-                const disabled = e.target.value === 'false'
-                for (const input of document.getElementsByClassName('disable-for-' + e.target.name)) {
-                    input.disabled = disabled
-                    input.required = !disabled
+        const passwordWordCount = 5
+
+        function isPasswordValid(password) {
+            return password.length > 0
+        }
+
+        function generatePassword() {
+            let password = ''
+            for (let i = 0; i < passwordWordCount; i++) {
+                const word = wordlist[Math.floor(Math.random() * wordlist.length)]
+                password += word.charAt(0).toUpperCase() + word.substring(1)
+            }
+            return password
+        }
+
+        function getIdx(element) {
+            return element.id.split('.')[0]
+        }
+
+        for (const input of document.getElementsByClassName('enable-password-input')) {
+            const submitButton = document.getElementById(getIdx(input) + '-accept-button')
+            input.value = generatePassword()
+            submitButton.disabled = !isPasswordValid(input.value)
+            input.addEventListener('input', () => {
+                submitButton.disabled = !isPasswordValid(input.value)
+            })
+        }
+
+        for (const input of document.getElementsByClassName('generate-password-button')) {
+            const passwordInput = document.getElementById(getIdx(input) + '.password')
+            input.addEventListener('click', () => {
+                passwordInput.value = generatePassword()
+            })
+        }
+
+        for (const input of document.getElementsByClassName('show-password-button')) {
+            const passwordInput = document.getElementById(getIdx(input) + '.password')
+            input.addEventListener('click', () => {
+                if (passwordInput.type === 'password') {
+                    passwordInput.type = 'text'
+                } else {
+                    passwordInput.type = 'password'
                 }
             })
         }
+
+        for (const input of document.getElementsByClassName('name-new_name-input')) {
+            const idx = getIdx(input)
+            const submitButton = document.getElementById(idx + '-accept-button')
+            const conflictName = document.getElementById(idx + '.name').value
+            submitButton.disabled = true
+            input.addEventListener('input', () => {
+                submitButton.disabled = input.value.length === 0 || input.value === conflictName
+            })
+        }
+
+
+
+
+
     </script>
 </body>
 </html>
