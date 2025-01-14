@@ -15,7 +15,6 @@ class Action(BaseModel, ABC):
 
 class EnableAction(Action):
     type: Literal["enable"] = "enable"
-    # todo: requires password?
 
 
 class JoinAction(Action):
