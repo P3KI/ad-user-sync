@@ -40,7 +40,8 @@ class JoinResolution(BaseResolution):
 
 class NameResolution(BaseResolution):
     type: Literal["name"] = "name"
-    name: Annotated[str | None, Field(default="", exclude=True)]
+    name: str
+    new_name: Annotated[str | None, Field(default="", exclude=True)]
 
 
 Resolution = Annotated[EnableResolution | JoinResolution | NameResolution, Field(discriminator="type")]
@@ -63,18 +64,19 @@ class ResolutionList(FileBaseModel):
         resolutions = filter(lambda r: r.is_resolved, resolutions)
         return filter(lambda r: r.user == user, resolutions)
 
+    def get_enable(self, user: str) -> EnableResolution | None:
+        # get the latest enable resolution for this user
+        return next(iter(self._filter(EnableResolution, user)), None)
+
     def get_join(self, user: str, group: str) -> JoinResolution | None:
         # get the last join resolution for this user and group
         resolutions = filter(lambda r: r.group == group, self._filter(JoinResolution, user))
         return next(resolutions, None)
 
-    def get_enable(self, user: str) -> EnableResolution | None:
-        # get the latest enable resolution for this user
-        return next(self._filter(EnableResolution, user), None)
-
-    def get_name(self, user: str) -> NameResolution | None:
+    def get_name(self, user: str, name: str) -> NameResolution | None:
         # get the latest name resolution for this user
-        return next(self._filter(NameResolution, user), None)
+        resolutions = filter(lambda r: r.name == name, self._filter(NameResolution, user))
+        return next(resolutions, None)
 
     def get_rejected(self) -> ResolutionList:
         return ResolutionList(resolutions=list(filter(lambda r: r.is_rejected, self.resolutions)))
