@@ -70,7 +70,7 @@ def import_users(
                     enable=False,
                     optional_attributes=user_attributes | {"sAMAccountName": account_name},
                 )
-                print(f'User "{user}": Created')
+                print(f"{user}: Created")
             except CatchableADExceptions:
                 # creation failed. check if it was because of a name conflict
                 conflict_user = active_directory.find_single_user(
@@ -97,7 +97,7 @@ def import_users(
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
             if user_attributes != old_attributes:
                 user.update_attributes(user_attributes)
-                print(f'User "{user}": Updated attributes')
+                print(f"{user}: Updated attributes")
 
         ###
         # Handle special attributes that can not be set via update_attributes, because they require custom logic.
@@ -124,10 +124,10 @@ def import_users(
                     user.set_password(enable_resolution.password)
                     user.enable()
                 else:
-                    print(f'User "{user}": Activation requires password')
+                    print(f"{user}: Activation requires password")
                     actions.append(EnableAction(user=user.dn))
             else:
-                print(f'User "{user}": Denied activation')
+                print(f"{user}: User activation was rejected manually ({enable_resolution.timestamp})")
 
         # Collect group membership
         # We can't set group membership for users, instead we have to set user members for groups
@@ -149,7 +149,7 @@ def import_users(
         if len(removed_members) > 0:
             group.remove_members(removed_members)
             for user in removed_members:
-                print(f'User "{user}": Removed from group "{group.cn}"')
+                print(f'{user}: Removed from group "{group.cn}"')
 
         if group not in restricted_groups:
             added_members = new_members - old_members
@@ -162,17 +162,17 @@ def import_users(
                 elif join_resolution.accept is True:
                     added_members.append(user)
                 else:
-                    print(f'User "{user}": Denied joining group "{group.cn}"')
+                    print(f'{user}: Joining group "{group.cn}" rejected manually ({join_resolution.timestamp})')
 
         if len(added_members) > 0:
             group.add_members(added_members)
             for user in added_members:
-                print(f'User "{user}": Joined group "{group.cn}"')
+                print(f'{user}: Joined group "{group.cn}"')
 
     # Managed users currently in AD
     removed_users = old_users - new_users
     for user in removed_users:
-        print(f'User "{user}": Disabled (no longer in import list)')
+        print(f"{user}: Disabled (no longer in import list)")
         user.disable()
 
     return actions
