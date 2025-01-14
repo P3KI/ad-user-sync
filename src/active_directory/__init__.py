@@ -1,2 +1,2 @@
-from .exceptions import CatchableADExceptions
+from .CatchableADExceptions import CatchableADExceptions
 from .CachedActiveDirectory import CachedActiveDirectory

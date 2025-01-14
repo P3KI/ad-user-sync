@@ -1,7 +1,5 @@
-from pyad import pyadutils
+from pyad import pyadutils, ADQuery
 import json
-
-from pyad.adquery import ADQuery
 
 # import argparse
 

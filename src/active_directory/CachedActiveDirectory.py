@@ -1,9 +1,6 @@
 from functools import lru_cache
 
-from pyad.adcontainer import ADContainer
-from pyad.adgroup import ADGroup
-from pyad.adquery import ADQuery
-from pyad.aduser import ADUser
+from pyad import ADContainer, ADGroup, ADQuery, ADUser
 
 
 class CachedActiveDirectory:
