@@ -1,14 +1,14 @@
 {
-    "BasePath" : "CN=Users,DC=mydomain,DC=com",
-    "ManagedUserPath" : "CN=P3KI Managed",
-    "GroupMap" : {
+    "base_path" : "CN=Users,DC=mydomain,DC=com",
+    "managed_user_path" : "CN=P3KI Managed",
+    "group_map" : {
         "CN=t-Administrators" : "CN=p-Administrators",
         "CN=t-Operators"      : "CN=p-Operators",
         "CN=t-Viewers"        : "CN=p-Viewers",
         "*"                   : "CN=p-Managed"
     },
-    "RestrictedGroups" : ["CN=p-Administrators"],
-    "PrefixAccountNames" : "p-",
-    "DefaultExpiration" : "P1M2D",
-    "InteractiveActionsOutput" : "rejections.json"
+    "restricted_groups" : ["CN=p-Administrators"],
+    "prefix_account_names" : "p-",
+    "default_expiration" : "P1M2D",
+    "rejected_actions" : "rejections.json"
 }

@@ -20,8 +20,7 @@ class ImportConfig(FileBaseModel):
     base_path: Annotated[
         str,
         Field(
-            alias="BasePath",
-            title="BasePath",
+            title="Base Path",
             description=dedent("""
                 Mandatory.
                 
@@ -39,8 +38,7 @@ class ImportConfig(FileBaseModel):
         str,
         Field(
             default="CN=P3KI Managed",
-            alias="ManagedUserPath",
-            title="ManagedUserPath",
+            title="Managed User Path",
             description=dedent("""
                 Optional (but recommended).
     
@@ -61,8 +59,7 @@ class ImportConfig(FileBaseModel):
         Dict[str, str],
         Field(
             default_factory=dict,
-            alias="GroupMap",
-            title="GroupMap",
+            title="Group Map",
             description=dedent("""
                 Optional (but recommended).
                 
@@ -94,8 +91,7 @@ class ImportConfig(FileBaseModel):
         List[str],
         Field(
             default_factory=list,
-            alias="RestrictedGroups",
-            title="RestrictedGroups",
+            title="Restricted Groups",
             description=dedent("""
                 Optional.
                 
@@ -112,8 +108,7 @@ class ImportConfig(FileBaseModel):
         str,
         Field(
             default="",
-            alias="PrefixAccountNames",
-            title="PrefixAccountNames",
+            title="Prefix Account Names",
             description=dedent("""
                 Optional.
                 
@@ -130,8 +125,7 @@ class ImportConfig(FileBaseModel):
         timedelta,
         Field(
             default="P1M1D",
-            alias="DefaultExpiration",
-            title="DefaultExpiration",
+            title="Default Expiration",
             description=dedent("""
                 Optional.
                 
@@ -140,6 +134,8 @@ class ImportConfig(FileBaseModel):
                 The expiration date is extended by the specified time every time the import script is done.
                 If the source account expiration date is closer than the specified time, the source value is
                 used instead.
+                
+                Format is (ISO_8601)[https://en.wikipedia.org/wiki/ISO_8601#Durations].
                 
                 The default value is 1 month and 1 day.
                 
@@ -150,12 +146,11 @@ class ImportConfig(FileBaseModel):
         AfterValidator(min_timedelta(timedelta(days=1))),
     ]
 
-    interactive_actions_output: Annotated[
+    rejected_actions: Annotated[
         str,
         Field(
-            default="Pending.json",
-            alias="InteractiveActionsOutput",
-            title="InteractiveActionsOutput",
+            default="rejections.json",
+            title="Rejected Actions",
             description=dedent("""
                 Optional.
                 
@@ -164,7 +159,7 @@ class ImportConfig(FileBaseModel):
                 If the importer can not automatically perform certain actions (See "Interactive Actions" section) 
                 it will write them to the file specified here.
             """),
-            examples=["Pending.json"],
+            examples=["rejections.json"],
         ),
     ]
 

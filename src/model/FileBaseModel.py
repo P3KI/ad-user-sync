@@ -1,3 +1,4 @@
+import logging
 import os
 from typing import Type
 
@@ -9,9 +10,13 @@ class FileBaseModel(BaseModel):
     def load[T](cls: Type[T], file: str) -> T:
         if os.path.isfile(file):
             with open(file, "r") as f:
-                json_str = f.read()
-                if len(json_str) > 1:
-                    return cls.model_validate_json(json_str)
+                file_content = f.read()
+                if len(file_content) > 1:
+                    return cls.model_validate_json(file_content)
+                else:
+                    logging.warning(f"File {file} is empty. Continue with default {cls}")
+        else:
+            logging.warning(f"File {file} does not exist. Continue with default {cls}")
         return cls()
 
     def save(self, file: str) -> None:

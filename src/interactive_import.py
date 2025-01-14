@@ -21,7 +21,7 @@ def interactive_import(
             actions = import_users(
                 config=config,
                 input_file=input_file,
-                resolutions=Resolutions.load(config.interactive_actions_output),
+                resolutions=Resolutions.load(config.rejected_actions),
             )
             return jinja2_template("resolve.html.jinja", actions=actions)
         except CatchableADExceptions as e:
@@ -40,10 +40,10 @@ def interactive_import(
         new_resolutions = Resolutions(resolutions=resolution_props)
 
         # append new resolutions to existing
-        resolutions = Resolutions.load(config.interactive_actions_output) + new_resolutions
+        resolutions = Resolutions.load(config.rejected_actions) + new_resolutions
 
         # save rejections
-        resolutions.get_rejected().save(config.interactive_actions_output)
+        resolutions.get_rejected().save(config.rejected_actions)
 
         # apply resolutions
         try:
