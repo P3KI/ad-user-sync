@@ -88,7 +88,7 @@ def import_users(
                             user=cn,
                             attributes=user_attributes,
                             name=account_name,
-                            conflict_user=conflict_user.cn,
+                            conflict_user=conflict_user.dn,
                         )
                     )
                     # continue with next user to import
