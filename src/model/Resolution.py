@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from abc import ABC
 from typing import Generic, TypeVar, Annotated, Literal, List, Iterable, Type
+from typing import TypeVar, Annotated, Literal, List, Iterable, Type
 
 from pydantic import BaseModel, Field, RootModel
 
-
-T = TypeVar("T")
+from .FileBaseModel import FileBaseModel
 
 
 class BaseResolution(BaseModel, ABC):
@@ -36,16 +36,20 @@ class NameResolution(BaseResolution):
 
 Resolution = Annotated[EnableResolution | JoinResolution | NameResolution, Field(discriminator="type")]
 
+R = TypeVar("R", bound=Resolution)
 
-class Resolutions(RootModel[List[Resolution]]):
 
-    root: Annotated[List[Resolution], Field(default_factory=list)]
+class Resolutions(FileBaseModel):
+    resolutions: Annotated[List[Resolution], Field(default_factory=list)]
 
     def __len__(self) -> int:
-        return len(self.root)
+        return len(self.resolutions)
 
-    def _filter(self, cls: Type[Resolution], user: str) -> Iterable[Resolution]:
-        resolutions = reversed(self.root)
+    def __add__(self, other: Resolutions) -> Resolutions:
+        return Resolutions(resolutions=self.resolutions + other.resolutions)
+
+    def _filter[R](self, cls: Type[R], user: str) -> Iterable[R]:
+        resolutions = reversed(self.resolutions)
         resolutions = filter(lambda r: isinstance(r, cls), resolutions)
         resolutions = filter(lambda r: r.is_resolved, resolutions)
         return filter(lambda r: r.user == user, resolutions)
@@ -63,15 +67,3 @@ class Resolutions(RootModel[List[Resolution]]):
         # get the latest name resolution for this user
         return next(self._filter(NameResolution, user), None)
 
-    @classmethod
-    def load(cls, file: str) -> Resolutions:
-        with open(file, "r") as f:
-            json_str = f.read()
-            if len(json_str) > 1:
-                return cls.model_validate_json(json_str)
-            else:
-                return cls()
-
-    def save(self, file: str) -> None:
-        with open(file, "w") as out:
-            out.write(self.model_dump_json(indent=4))
