@@ -1,11 +1,12 @@
 import os
+from typing import Type
 
 from pydantic import BaseModel
 
 
 class FileBaseModel(BaseModel):
     @classmethod
-    def load(cls, file: str) -> 'Self':
+    def load[T](cls: Type[T], file: str) -> T:
         if os.path.isfile(file):
             with open(file, "r") as f:
                 json_str = f.read()

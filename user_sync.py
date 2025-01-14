@@ -77,6 +77,7 @@ if __name__ == "__main__":
 
     elif vars(args)["interactive"]:
         from src import ImportConfig, interactive_import
+
         interactive_import(
             config=ImportConfig.load(args.config),
             input_file=args.user_file[0],
