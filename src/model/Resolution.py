@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import Generic, TypeVar, Annotated, Literal, List, Iterable, Type
+from datetime import datetime
 from typing import TypeVar, Annotated, Literal, List, Iterable, Type
 
-from pydantic import BaseModel, Field, RootModel
+from pydantic import BaseModel, Field
 
 from .FileBaseModel import FileBaseModel
 
@@ -13,10 +13,19 @@ class BaseResolution(BaseModel, ABC):
     type: str
     user: str
     accept: Annotated[bool | None, Field(default=None)]
+    timestamp: Annotated[datetime, Field(default_factory=lambda: datetime.now().astimezone())]
 
     @property
     def is_resolved(self) -> bool:
         return self.accept is not None
+
+    @property
+    def is_accepted(self) -> bool:
+        return self.accept is True
+
+    @property
+    def is_rejected(self) -> bool:
+        return self.accept is False
 
 
 class EnableResolution(BaseResolution):
@@ -67,3 +76,5 @@ class Resolutions(FileBaseModel):
         # get the latest name resolution for this user
         return next(self._filter(NameResolution, user), None)
 
+    def get_rejected(self) -> Resolutions:
+        return Resolutions(resolutions=list(filter(lambda r: r.is_rejected, self.resolutions)))
