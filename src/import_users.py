@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from logging import Logger
-from typing import Dict, List, Any, Set, Iterable
+from typing import Dict, List, Any, Set
 
 from pyad import ADGroup, ADUser
 
@@ -181,10 +181,16 @@ def import_users(
                 elif join_resolution.accept is True:
                     # resolved action was found and it was accepted
                     new_members.append(user)
-                    logger.info(f'{user}: Not joining group "{group.cn}" (rejected manually at {join_resolution.timestamp})')
+                    logger.info(
+                        f'{user}: Not joining group "{group.cn}" '
+                        f'(rejected manually at {join_resolution.timestamp})'
+                    )
                 else:
                     # resolved action was found and it was rejected
-                    logger.info(f'{user}: Not joining restricted group "{group.cn}" (rejected manually at {join_resolution.timestamp})')
+                    logger.info(
+                        f'{user}: Not joining restricted group "{group.cn}" '
+                        f'(rejected manually at {join_resolution.timestamp})'
+                    )
 
             # add the approved members to the group
             if len(new_members) > 0:

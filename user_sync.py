@@ -3,8 +3,9 @@
 import argparse
 import json
 import sys
+from logging import getLogger
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 arg_parser = argparse.ArgumentParser(
     prog="UserImport",
@@ -68,9 +69,15 @@ if __name__ == "__main__":
     elif vars(args)["import"]:
         from src import import_users, ImportConfig
 
+        try:
+            config = ImportConfig.load(args.config, logger=getLogger())
+        except ValidationError:
+            exit(1)
+
         actions = import_users(
-            config=ImportConfig.load(args.config),
+            config=config,
             input_file=args.user_file[0],
+            logger=getLogger("import_users"),
         )
 
         print(json.dumps(list(map(BaseModel.model_dump, actions)), indent=4))
@@ -78,7 +85,13 @@ if __name__ == "__main__":
     elif vars(args)["interactive"]:
         from src import ImportConfig, interactive_import
 
+        try:
+            config = ImportConfig.load(args.config, logger=getLogger())
+        except ValidationError:
+            exit(1)
+
         interactive_import(
-            config=ImportConfig.load(args.config),
+            config=config,
             input_file=args.user_file[0],
+            logger=getLogger("interactive_import"),
         )

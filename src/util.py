@@ -1,4 +1,10 @@
+from typing import Any
+
 from pydantic import ValidationError
+
+
+def not_none(v: Any) -> bool:
+    return v is not None
 
 
 def format_validation_error(e: ValidationError, source: str = None, indentation: str = "    ") -> str:
@@ -16,7 +22,7 @@ def format_validation_error(e: ValidationError, source: str = None, indentation:
         if not is_root:
             message += " -> ".join(map(str, error["loc"])) + ": "
 
-        message += error['msg']
+        message += error["msg"]
 
         if not is_root:
             value = error.get("input")

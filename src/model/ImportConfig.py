@@ -1,8 +1,8 @@
 from datetime import timedelta, datetime
 from textwrap import dedent
-from typing import Annotated, Dict, List, Callable
+from typing import Annotated, Dict, List
 
-from pydantic import Field, AfterValidator
+from pydantic import Field
 
 from .FileBaseModel import FileBaseModel
 
@@ -150,6 +150,20 @@ class ImportConfig(FileBaseModel):
                 it will write them to the file specified here.
             """),
             examples=["rejections.json"],
+        ),
+    ]
+
+    log_input_file_content: Annotated[
+        bool,
+        Field(
+            default=False,
+            title="Log Input File Content",
+            description=dedent("""
+                Optional.
+                
+                If set, the content of the input file will be written to the log every time it is evaluated. 
+            """),
+            examples=[False],
         ),
     ]
 
