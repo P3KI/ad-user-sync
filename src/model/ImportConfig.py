@@ -7,15 +7,6 @@ from pydantic import Field, AfterValidator
 from .FileBaseModel import FileBaseModel
 
 
-def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
-    def wrapped_min(value: timedelta) -> timedelta:
-        if value < minimum:
-            raise ValueError(f"Duration is too short: {value}. (Minimum {minimum})")
-        return value
-
-    return wrapped_min
-
-
 class ImportConfig(FileBaseModel):
     base_path: Annotated[
         str,
@@ -95,10 +86,9 @@ class ImportConfig(FileBaseModel):
             description=dedent("""
                 Optional.
                 
-                Specifies groups that may not assigned to any user even though they are listed in the `GroupMap`.
+                Specifies groups that may not assigned to any user even though they are listed in the `Group Map`.
                 
-                Instead, these actions are deferred to the `InteractiveActionsOutput` for use with a user interactive
-                application.
+                Instead, joining these groups must be accepted during an `Interactive Action`.
             """),
             examples=[["CN=p-Administrators"]],
         ),
@@ -142,8 +132,8 @@ class ImportConfig(FileBaseModel):
                 The minimum value is 1 day. 
             """),
             examples=["P1M1D"],
+            gt=timedelta(days=1),
         ),
-        AfterValidator(min_timedelta(timedelta(days=1))),
     ]
 
     rejected_actions: Annotated[
