@@ -241,6 +241,7 @@ def create_user(
 
         # name conflict detected -> add required action
         # the action should refer to the account_name from the import file, not a previous renaming
+        previous_error = None
         if account_name != new_account_name:
             conflict_user = active_directory.find_single_user(
                 domain=user_container.get_domain(),
@@ -265,9 +266,13 @@ def create_user(
                     logger=logger,
                 )
 
+            previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.dn})."
+
         return None, NameAction(
             user=cn,
             attributes=user_attributes,
             name=account_name,
+            input_name=new_account_name,
             conflict_user=conflict_user.dn,
+            error=previous_error,
         )

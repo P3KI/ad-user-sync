@@ -27,4 +27,5 @@ class NameAction(Action):
     type: Literal["name"] = "name"
     name: str
     conflict_user: str
+    input_name: str
     attributes: Dict[str, Any]
