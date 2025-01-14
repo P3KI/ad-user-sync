@@ -1,3 +1,4 @@
+import json
 from logging import Logger
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import bottle
 from .util import format_validation_error
 
 bottle.TEMPLATE_PATH.append(Path(__file__).parent.parent / "templates")
+static_file_path = Path(__file__).parent.parent / "templates" / "static"
 
 
 def interactive_import(
@@ -30,6 +32,14 @@ def interactive_import(
         except CatchableADExceptions as e:
             logger.exception("error during import_users")
             return jinja2_template("error.html.jinja", err=e)
+
+    @bottle.get("/static/<filepath:path>")
+    def static(filepath):
+        return bottle.static_file(filepath, root=static_file_path)
+
+    @route("/")
+    def get_root():
+        return run_import(resolutions=ResolutionList.load(config.rejected_actions, logger=logger))
 
     @post("/")
     def post_root():
