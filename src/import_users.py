@@ -33,7 +33,7 @@ def import_users(
     restricted_groups = [active_directory.get_group(config.full_path(v)) for v in config.restricted_groups]
 
     # Read users form input file
-    with open(input_file) as f:
+    with open(config.input_file) as f:
         users_attributes: List[Dict[str, Any]] = json.load(f)
 
     if config.log_input_file_content:

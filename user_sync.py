@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import logging
 import sys
 from logging import getLogger
 
@@ -90,8 +91,9 @@ if __name__ == "__main__":
         except ValidationError:
             exit(1)
 
+        logger = getLogger("interactive")
+        logger.setLevel(logging.INFO)
         interactive_import(
             config=config,
-            input_file=args.user_file[0],
-            logger=getLogger("interactive_import"),
+            logger=logger,
         )

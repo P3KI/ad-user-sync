@@ -17,7 +17,6 @@ bottle.TEMPLATE_PATH.append(Path(__file__).parent.parent / "templates")
 def interactive_import(
     config: ImportConfig,
     logger: Logger,
-    input_file: str,
     port: int = 8080,
 ):
     @route("/")
@@ -59,7 +58,6 @@ def interactive_import(
         try:
             actions = import_users(
                 config=config,
-                input_file=input_file,
                 resolutions=resolutions,
                 logger=logger.getChild("import_users"),
             )

@@ -1,4 +1,5 @@
 from datetime import timedelta, datetime
+from pathlib import Path
 from textwrap import dedent
 from typing import Annotated, Dict, List
 
@@ -8,6 +9,19 @@ from .FileBaseModel import FileBaseModel
 
 
 class ImportConfig(FileBaseModel):
+    input_file: Annotated[
+        Path,
+        Field(
+            title="Input File",
+            description=dedent("""
+                Mandatory.
+                
+                Specifies the user list file for import.
+            """),
+            examples=["Users.json"],
+        ),
+    ]
+
     base_path: Annotated[
         str,
         Field(
@@ -179,3 +193,4 @@ class ImportConfig(FileBaseModel):
 
     def get_default_expiration_date(self) -> datetime:
         return datetime.now() + self.default_expiration
+
