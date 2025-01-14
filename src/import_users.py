@@ -11,9 +11,9 @@ from .model import ImportConfig, Resolutions, Action, NameAction, EnableAction, 
 def import_users(
     config: ImportConfig,
     input_file: str,
-    active_directory: CachedActiveDirectory,
     resolutions: Resolutions = None,
 ) -> List[Action]:
+    active_directory = CachedActiveDirectory()
 
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
@@ -38,11 +38,12 @@ def import_users(
     # The path where all managed users will be created. Defined by ManagedUserPath
     user_container = active_directory.get_container(config.full_path(config.managed_user_path))
 
+    # All users imported during this run
+    old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
+    new_users: Set[ADUser] = set()
+
     # New memberships in all managed groups are collected here.
     new_group_members: Dict[ADGroup, Set[ADUser]] = {k: set() for k in group_map.values()}
-
-    # All users imported during this run
-    new_users: Set[ADUser] = set()
 
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
@@ -169,7 +170,6 @@ def import_users(
                 print(f'User "{user}": Joined group "{group.cn}"')
 
     # Managed users currently in AD
-    old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
     removed_users = old_users - new_users
     for user in removed_users:
         print(f'User "{user}": Disabled (no longer in import list)')

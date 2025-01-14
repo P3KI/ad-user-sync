@@ -4,6 +4,8 @@ import argparse
 import json
 import sys
 
+from pydantic import BaseModel
+
 arg_parser = argparse.ArgumentParser(
     prog="UserImport",
     description="Import/Export Windows ActiveDirectory user accounts",
@@ -32,7 +34,7 @@ arg_group.add_argument(
     help="Import Mode: File containing the users to import",
 )
 arg_group.add_argument(
-    "--resolve",
+    "--interactive",
     "-r",
     action="store_true",
     help="Import Mode: File containing the users to import",
@@ -48,9 +50,9 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
 
     try:
-        # Read config
-        with open(args.config) as cfg:
-            config = json.load(cfg)
+        with open(args.config, "r") as f:
+            config_json_str = f.read()
+
     except FileNotFoundError:
         print(f"Error: Config file '{args.config}' not found.", file=sys.stderr)
         exit(1)
@@ -64,7 +66,18 @@ if __name__ == "__main__":
         exporter.run()
 
     elif vars(args)["import"]:
-        from src.UserImport import UserImporter
+        from src import import_users, ImportConfig
 
-        importer = UserImporter(input_file=args.user_file[0], config=config)
-        importer.run()
+        actions = import_users(
+            config=ImportConfig.model_validate_json(config_json_str),
+            input_file=args.user_file[0],
+        )
+
+        print(json.dumps(list(map(BaseModel.model_dump, actions)), indent=4))
+
+    elif vars(args)["interactive"]:
+        from src import ImportConfig, interactive_import
+        interactive_import(
+            config=ImportConfig.model_validate_json(config_json_str),
+            input_file=args.user_file[0],
+        )
