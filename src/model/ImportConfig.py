@@ -2,7 +2,9 @@ from datetime import timedelta, datetime
 from textwrap import dedent
 from typing import Annotated, Dict, List, Callable
 
-from pydantic import BaseModel, Field, AfterValidator
+from pydantic import Field, AfterValidator
+
+from .FileBaseModel import FileBaseModel
 
 
 def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
@@ -14,7 +16,7 @@ def min_timedelta(minimum: timedelta) -> Callable[[timedelta], timedelta]:
     return wrapped_min
 
 
-class ImportConfig(BaseModel):
+class ImportConfig(FileBaseModel):
     base_path: Annotated[
         str,
         Field(

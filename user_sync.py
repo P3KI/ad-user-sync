@@ -69,7 +69,7 @@ if __name__ == "__main__":
         from src import import_users, ImportConfig
 
         actions = import_users(
-            config=ImportConfig.model_validate_json(config_json_str),
+            config=ImportConfig.load(args.config),
             input_file=args.user_file[0],
         )
 
@@ -78,6 +78,6 @@ if __name__ == "__main__":
     elif vars(args)["interactive"]:
         from src import ImportConfig, interactive_import
         interactive_import(
-            config=ImportConfig.model_validate_json(config_json_str),
+            config=ImportConfig.load(args.config),
             input_file=args.user_file[0],
         )

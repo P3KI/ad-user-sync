@@ -10,5 +10,5 @@
     "RestrictedGroups" : ["CN=p-Administrators"],
     "PrefixAccountNames" : "p-",
     "DefaultExpiration" : "P1M2D",
-    "InteractiveActionsOutput" : "Pending.json"
+    "InteractiveActionsOutput" : "rejections.json"
 }
