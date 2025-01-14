@@ -19,12 +19,11 @@ def interactive_import(
     logger: Logger,
     port: int = 8080,
 ):
-    @route("/")
-    def get_root():
+    def run_import(resolutions: ResolutionList) -> str:
         try:
             actions = import_users(
                 config=config,
-                resolutions=ResolutionList.load(config.rejected_actions, logger=logger),
+                resolutions=resolutions,
                 logger=logger.getChild("import_users"),
             )
             return jinja2_template("resolve.html.jinja", actions=actions)
@@ -41,6 +40,7 @@ def interactive_import(
             idx, prop = key.split(".")
             resolution_props_by_idx.setdefault(idx, {})[prop] = val
         resolution_props = list(map(lambda x: x[1], sorted(resolution_props_by_idx.items())))
+        logger.debug(f"POSTed resolutions: {json.dumps(resolution_props)}")
         try:
             new_resolutions = ResolutionList(resolutions=resolution_props)
         except ValidationError as e:
@@ -54,18 +54,6 @@ def interactive_import(
         # save rejections
         resolutions.get_rejected().save(config.rejected_actions)
 
-        # apply resolutions
-        try:
-            actions = import_users(
-                config=config,
-                resolutions=resolutions,
-                logger=logger.getChild("import_users"),
-            )
-        except Exception as e:
-            logger.exception("Got exception on import_users")
-            return jinja2_template("error.html.jinja", err=e)
-
-        # return new action interactive form
-        return jinja2_template("resolve.html.jinja", actions=actions)
+        return run_import(resolutions=resolutions)
 
     run(host="localhost", port=port)
