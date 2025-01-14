@@ -11,6 +11,7 @@ R = TypeVar("R")
 class Action(BaseModel, ABC):
     type: str
     user: str
+    error: str | None = None
 
 
 class EnableAction(Action):

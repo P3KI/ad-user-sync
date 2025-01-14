@@ -56,6 +56,9 @@
         .enable-password-input {
             width: 300px;
         }
+        .error {
+            color: red;
+        }
     </style>
 </head>
 <body>
@@ -106,6 +109,12 @@
                                     value="{{action.name}}"
                                 />
                             </td>
+                        </tr>
+                    {% endif %}
+                    {% if action.error %}
+                        <tr>
+                            <td>Previous Error</td>
+                            <td class="error">{{ action.error }}</td>
                         </tr>
                     {% endif %}
 
@@ -222,10 +231,6 @@
                 submitButton.disabled = input.value.length === 0 || input.value === conflictName
             })
         }
-
-
-
-
 
     </script>
 </body>

@@ -111,9 +111,19 @@ def import_users(
             elif enable_resolution.accept is True:
                 # resolved action was found and it got accepted
                 # todo handle password requirements error
-                user.set_password(enable_resolution.password)
-                user.enable()
-                logger.info(f"{user}: Was enabled (accepted manually)")
+                try:
+                    user.set_password(enable_resolution.password)
+                    user.enable()
+                    logger.info(f"{user}: Was enabled (accepted manually)")
+                except win32Exception as e:
+                    if e.error_info.get("error_code") != '0x800708c5':
+                        raise
+                    logger.warning(f"{user}: Manually provided password does not match requirements")
+                    actions.append(EnableAction(
+                        user=user.dn,
+                        error=e.error_info.get("message", "Password does not meet requirements"),
+                    ))
+
             else:
                 # resolved action was found and it got rejected
                 logger.info(f"{user}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
@@ -215,9 +225,9 @@ def create_user(
             logger.info(f"{user}: Was created with renamed account name ({account_name} -> {new_account_name})")
 
         return user, None
-    except CatchableADExceptions as e:
+    except win32Exception as e:
         # creation failed. check if it was because of a name conflict
-        if not isinstance(e, win32Exception) or e.error_info.get("error_code") != '0x80071392':
+        if e.error_info.get("error_code") != '0x80071392':
             # it was another problem. re-raise exception
             raise
 
