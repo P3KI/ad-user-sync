@@ -1,12 +1,12 @@
 import json
 from datetime import datetime
 from logging import Logger
-from typing import Dict, List, Any, Set
+from typing import Dict, List, Any, Set, Tuple
 
-from pyad import ADGroup, ADUser
+from pyad import ADGroup, ADUser, win32Exception, ADContainer
 
 from .active_directory import CatchableADExceptions, CachedActiveDirectory
-from .model import ImportConfig, ResolutionList, Action, NameAction, EnableAction, JoinAction
+from .model import ImportConfig, ResolutionList, Action, NameAction, EnableAction, JoinAction, NameResolution
 from .util import not_none
 
 
@@ -62,40 +62,20 @@ def import_users(
         # Create user or update user attributes
         user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
         if user is None:
-            # check if there should be a renaming applied for this user
-            name_resolution = resolutions.get_name(cn)
-            if name_resolution is not None and name_resolution.accept is True and len(name_resolution.name) > 0:
-                account_name = name_resolution.name
-
-            # create a new user
-            try:
-                user = user_container.create_user(
-                    name=cn,
-                    enable=False,
-                    optional_attributes=user_attributes | {"sAMAccountName": account_name},
-                )
-                logger.info(f"{user}: Was created")
-            except CatchableADExceptions:
-                # creation failed. check if it was because of a name conflict
-                conflict_user = active_directory.find_single_user(
-                    domain=user_container.get_domain(),
-                    where=f"sAMAccountName = '{account_name}'",
-                )
-                if conflict_user:
-                    # name conflict detected -> add required action
-                    actions.append(
-                        NameAction(
-                            user=cn,
-                            attributes=user_attributes,
-                            name=account_name,
-                            conflict_user=conflict_user.dn,
-                        )
-                    )
-                    # continue with next user to import
-                    continue
-                else:
-                    # it was another problem. re-raise exception
-                    raise
+            user, name_action = create_user(
+                cn=cn,
+                account_name=account_name,
+                user_attributes=user_attributes,
+                name_resolution=resolutions.get_name(cn, account_name),
+                active_directory=active_directory,
+                user_container=user_container,
+                logger=logger,
+            )
+            if name_action:
+                actions.append(name_action)
+            if user is None:
+                # go to next user to import if creation failed
+                continue
         else:
             # update the attributes of existing user
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
@@ -205,3 +185,79 @@ def import_users(
         logger.info(f"{user}: Was disabled (user no longer in import list)")
 
     return actions
+
+
+def create_user(
+    cn: str,
+    account_name: str,
+    user_attributes: Dict[str, Any],
+    name_resolution: NameResolution | None,
+    active_directory: CachedActiveDirectory,
+    user_container: ADContainer,
+    logger: Logger,
+) -> Tuple[ADUser | None, NameAction | None]:
+    # check if there should be a renaming applied for this user
+    if name_resolution is not None and name_resolution.is_accepted:
+        new_account_name = name_resolution.new_name
+    else:
+        new_account_name = account_name
+
+    # create a new user
+    try:
+        user = user_container.create_user(
+            name=cn,
+            enable=False,
+            optional_attributes=user_attributes | {"sAMAccountName": new_account_name},
+        )
+        if account_name == new_account_name:
+            logger.info(f"{user}: Was created")
+        else:
+            logger.info(f"{user}: Was created with renamed account name ({account_name} -> {new_account_name})")
+
+        return user, None
+    except CatchableADExceptions as e:
+        # creation failed. check if it was because of a name conflict
+        if not isinstance(e, win32Exception) or e.error_info.get("error_code") != '0x80071392':
+            # it was another problem. re-raise exception
+            raise
+
+        conflict_user = active_directory.find_single_user(
+            domain=user_container.get_domain(),
+            where=f"sAMAccountName = '{new_account_name}'",
+        )
+        if conflict_user is None:
+            # it was another problem. re-raise exception
+            raise
+
+        # name conflict detected -> add required action
+        # the action should refer to the account_name from the import file, not a previous renaming
+        if account_name != new_account_name:
+            conflict_user = active_directory.find_single_user(
+                domain=user_container.get_domain(),
+                where=f"sAMAccountName = '{account_name}'",
+            )
+
+            # edge case:
+            if conflict_user is None:
+                # seems that the original account name is available in the meantime
+                logger.warning(
+                    f"Account renaming applied for {cn} ({account_name} -> {new_account_name}) "
+                    f"which gave another name conflict. But the original account name seems to be "
+                    f"available in the meantime."
+                )
+                return create_user(
+                    cn=cn,
+                    account_name=account_name,
+                    user_attributes=user_attributes,
+                    name_resolution=None,
+                    active_directory=active_directory,
+                    user_container=user_container,
+                    logger=logger,
+                )
+
+        return None, NameAction(
+            user=cn,
+            attributes=user_attributes,
+            name=account_name,
+            conflict_user=conflict_user.dn,
+        )
