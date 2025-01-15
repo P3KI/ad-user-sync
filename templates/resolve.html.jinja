@@ -1,32 +1,26 @@
 
 {% macro dict_table(data) %}
-  <table style="margin: -1px;">
-    <tbody>
-      {% for key, value in data.items() %}
-      {% if value != None %}
+  <table>
+      {% for key, value in data.items() | rejectattr(1, 'none') %}
         <tr>
           <td>{{ key }}</td>
           <td>
             {% if value is mapping %}
-              {{ dict_table(value, table_class, indent_level + 1) }}
+              {{ dict_table(value, show_none) }}
             {% else %}
               {{ value }}
             {% endif %}
           </td>
         </tr>
-      {% endif %}
       {% endfor %}
-    </tbody>
   </table>
 {% endmacro %}
 
 {% set type_descriptions = {
     'enable': 'Enable User',
     'join': 'Join Group',
-    'name': 'Name Conflict',
+    'name': 'Account Name Conflict',
 } %}
-
-
 
 <!DOCTYPE html>
 <html lang="en">
@@ -35,26 +29,57 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>AD Permission Sync</title>
+    <link rel="stylesheet" href="static/normalize.css"></link>
     <style>
+        :root {
+            --cell-padding: 6px;
+            --table-border-width: 1px;
+        }
+
         body {
             font-family: monospace;
         }
+
+        /* table */
         table, tr {
-          width: 100%;
-          border-collapse: collapse;
+            width: 100%;
+            border: none;
+            border-collapse: collapse;
         }
         td {
-          border-collapse: collapse;
-          border: 1px solid black;
+            border: var(--table-border-width) solid black;
+            padding: var(--cell-padding);
+            overflow: hidden;
         }
-        .action-table {
-            margin-bottom: 20px;
+        td:first-child {
+            width: 1px;
+            white-space: nowrap;
         }
-        td {
-            padding: 6px;
+
+        /* nested table */
+        td > table {
+            margin: calc(var(--cell-padding) * -1 - 1px);
+            width: calc(100% + 14px);
         }
-        .enable-password-input {
-            width: 300px;
+        td > table td {
+            border-color: lightgray;
+        }
+
+        /* custom classes */
+        .actions-table {
+            width: 800px;
+            margin: 20px auto;
+        }
+        .action-type {
+            font-weight: bold;
+            border: none;
+            padding-top: 1.5em;
+        }
+        .accept-reject-buttons:not(:first-child) {
+            margin-top: var(--cell-padding);
+        }
+        .password-input, .new-name-input {
+            width: 350px;
         }
         .error {
             color: red;
@@ -62,121 +87,167 @@
     </style>
 </head>
 <body>
-    <table class="action-table">
+    <table class="actions-table">
         {% for action in actions %}
-            {% set idx = loop.index0 %}
-            <form id="form" method="post">
-                <tbody>
-                    <tr style="font-weight: bold;">
-                        <td colspan="2">
-                            {{ type_descriptions[action.type] }}
-                            <input type="hidden" name="{{idx}}.type" value="{{action.type}}">
+            {% set action_id = loop.index0 %}
+            <form
+                id="{{ action_id }}"
+                action-type="{{ action.type }}"
+                class="action-form"
+                method="post"
+            >
+                {# type independent action attributes #}
+                <tr>
+                    <td class="action-type" colspan="2">
+                        {{ type_descriptions[action.type] }}
+                        <input type="hidden" name="type" value="{{ action.type }}" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>User</td>
+                    <td>
+                        {{ action.user }}
+                        <input type="hidden" name="user" value="{{ action.user }}" />
+                    </td>
+                </tr>
+
+                {# type dependent action attributes #}
+                {% if action.type == 'join' %}
+                    <tr>
+                        <td>Group</td>
+                        <td>
+                            {{ action.group }}
+                            <input type="hidden" name="group" value="{{ action.group }}" />
                         </td>
+                    </tr>
+                {% elif action.type == 'name' %}
+                    <tr>
+                        <td>User Attributes</td>
+                        <td>{{ dict_table(action.attributes) }}</td>
                     </tr>
                     <tr>
-                        <td>User</td>
-                        <td>
-                            {{ action.user }}
-                            <input type="hidden" name="{{idx}}.user" value="{{action.user}}">
-                        </td>
+                        <td>Conflict User</td>
+                        <td>{{ action.conflict_user }}</td>
                     </tr>
-                    {% if action.type == 'join' %}
-                        <tr>
-                            <td>Group</td>
-                            <td>
-                                {{ action.group }}
-                                <input type="hidden" name="{{idx}}.group" value="{{action.group}}" />
-                            </td>
-                        </tr>
-                    {% elif action.type == 'name' %}
-                        <tr>
-                            <td>User Attributes</td>
-                            <td style="padding: 0;">{{dict_table(action.attributes)}}</td>
-
-                        </tr>
-                        <tr>
-                            <td>Conflict User</td>
-                            <td>{{action.conflict_user}}</td>
-                        </tr>
-                        <tr>
-                            <td>Conflict Account Name</td>
-                            <td>
-                                {{ action.name }}
-                                <input
-                                    type="hidden"
-                                    id="{{idx}}.name"
-                                    name="{{idx}}.name"
-                                    value="{{action.name}}"
-                                />
-                            </td>
-                        </tr>
-                    {% endif %}
-                    {% if action.error %}
-                        <tr>
-                            <td>Previous Error</td>
-                            <td class="error">{{ action.error }}</td>
-                        </tr>
-                    {% endif %}
-
                     <tr>
-                        <td>Action</td>
+                        <td>Conflicting Account Name</td>
                         <td>
-                            {% if action.type == 'enable' %}
-                                <label for="{{idx}}.password">Password</label>
-                                <input
-                                    class="enable-password-input"
-                                    type="password"
-                                    id="{{idx}}.password"
-                                    name="{{idx}}.password"
-                                />
-                                <button
-                                    class="show-password-button"
-                                    id="{{idx}}.show"
-                                    type="button"
-                                >👁</button>
-                                <button
-                                    class="generate-password-button"
-                                    id="{{idx}}.generate"
-                                    type="button"
-                                >🗘</button>
-                            {% elif action.type == 'name' %}
-                                <label for="{{idx}}.new_name">New Name</label>
-                                <input
-                                    class="name-new_name-input"
-                                    type="text"
-                                    id="{{idx}}.new_name"
-                                    name="{{idx}}.new_name"
-                                    value="{{action.input_name}}"
-                                />
-                            {% endif %}
-                            <div style="margin-top: 8px;">
-                                <button
-                                    id="{{idx}}-accept-button"
-                                    type="submit"
-                                    name="{{idx}}.accept"
-                                    value="true"
-                                >Accept</button>
-                                <button
-                                    id="{{idx}}-reject-button"
-                                    type="submit"
-                                    name="{{idx}}.accept"
-                                    value="false"
-                                >Reject</button>
-                            </div>
+                            {{ action.name }}
+                            <input type="hidden" name="name" value="{{ action.name }}" />
                         </td>
                     </tr>
+                {% endif %}
 
-                </tbody>
+                {# action error #}
+                {% if action.error %}
+                    <tr>
+                        <td>Previous Error</td>
+                        <td class="error">{{ action.error }}</td>
+                    </tr>
+                {% endif %}
+
+                {# interaction #}
+                <tr>
+                    <td>Action</td>
+                    <td>
+
+                        {# type dependent fields #}
+                        {% if action.type == 'enable' %}
+
+                            <label for="{{action_id}}.password">Password</label>
+                            <input
+                                id="{{action_id}}.password"
+                                class="password-input"
+                                type="password"
+                                name="password"
+                            />
+                            <button
+                                id="{{action_id}}.show"
+                                class="password-show-button"
+                                type="button"
+                            >👁</button>
+                            <button
+                                id="{{action_id}}.generate"
+                                class="password-generate-button"
+                                type="button"
+                            >🗘</button>
+
+                        {% elif action.type == 'name' %}
+
+                            <label for="{{action_id}}.new-name">New Name</label>
+                            <input
+                                id="{{action_id}}.new-name"
+                                class="new-name-input"
+                                type="text"
+                                name="new_name"
+                                value="{{ action.input_name }}"
+                            />
+                        {% endif %}
+
+                        {# type independent accept/submit #}
+                        <div class="accept-reject-buttons">
+                            <button
+                                id="{{action_id}}.accept"
+                                class="accept-button"
+                                type="submit"
+                                name="accept"
+                                value="true"
+                            >Accept</button>
+                            <button
+                                id="{{action_id}}.reject"
+                                class="reject-button"
+                                type="submit"
+                                name="accept"
+                                value="false"
+                            >Reject</button>
+                        </div>
+                    </td>
+                </tr>
             </form>
-            <tr>
-                <td style="border: none;"> </td>
-            </tr>
         {% endfor %}
         </table>
 
     <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
-        const passwordWordCount = 5
+        const passwordWordCount = {{ password_word_count or 5 }}
+
+        for (const form of document.getElementsByClassName('action-form')) {
+            const actionId = form.id
+            const actionType = form.attributes['action-type'].value
+            const acceptButton = document.getElementById(actionId + '.accept')
+
+            if (actionType === 'enable') {
+                const passwordInput = document.getElementById(actionId + '.password')
+                const showButton = document.getElementById(actionId + '.show')
+                const generateButton = document.getElementById(actionId + '.generate')
+
+                if (passwordInput.value.length === 0) passwordInput.value = generatePassword()
+                acceptButton.disabled = !isPasswordValid(passwordInput.value)
+
+                generateButton.addEventListener('click', () => {
+                    passwordInput.value = generatePassword()
+                })
+                showButton.addEventListener('click', () => {
+                    passwordInput.type = passwordInput.type === 'password' ? 'text' : 'password'
+                })
+                passwordInput.addEventListener('input', () => {
+                    acceptButton.disabled = !isPasswordValid(passwordInput.value)
+                })
+
+
+            } else if (actionType === 'name') {
+                const newNameInput = document.getElementById(actionId + '.new-name')
+                const conflictName = form.querySelector('.accept-button')
+                    {#.getElementsByName('name')#}
+                console.log(conflictName)
+                acceptButton.disabled = true
+                newNameInput.addEventListener('input', () => {
+                    acceptButton.disabled = newNameInput.value.length === 0 || newNameInput.value === conflictName
+                })
+
+
+            }
+        }
 
         function isPasswordValid(password) {
             return password.length > 0
@@ -190,48 +261,7 @@
             }
             return password
         }
-
-        function getIdx(element) {
-            return element.id.split('.')[0]
-        }
-
-        for (const input of document.getElementsByClassName('enable-password-input')) {
-            const submitButton = document.getElementById(getIdx(input) + '-accept-button')
-            input.value = generatePassword()
-            submitButton.disabled = !isPasswordValid(input.value)
-            input.addEventListener('input', () => {
-                submitButton.disabled = !isPasswordValid(input.value)
-            })
-        }
-
-        for (const input of document.getElementsByClassName('generate-password-button')) {
-            const passwordInput = document.getElementById(getIdx(input) + '.password')
-            input.addEventListener('click', () => {
-                passwordInput.value = generatePassword()
-            })
-        }
-
-        for (const input of document.getElementsByClassName('show-password-button')) {
-            const passwordInput = document.getElementById(getIdx(input) + '.password')
-            input.addEventListener('click', () => {
-                if (passwordInput.type === 'password') {
-                    passwordInput.type = 'text'
-                } else {
-                    passwordInput.type = 'password'
-                }
-            })
-        }
-
-        for (const input of document.getElementsByClassName('name-new_name-input')) {
-            const idx = getIdx(input)
-            const submitButton = document.getElementById(idx + '-accept-button')
-            const conflictName = document.getElementById(idx + '.name').value
-            submitButton.disabled = true
-            input.addEventListener('input', () => {
-                submitButton.disabled = input.value.length === 0 || input.value === conflictName
-            })
-        }
-
     </script>
 </body>
 </html>
+
