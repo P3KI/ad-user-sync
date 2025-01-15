@@ -1,4 +1,5 @@
 import json
+import webbrowser
 from logging import Logger
 from pathlib import Path
 
@@ -10,7 +11,7 @@ from .model import ResolutionList
 from bottle import route, run, jinja2_template, post, request
 import bottle
 
-from .util import format_validation_error
+from .util import format_validation_error, random_string
 
 bottle.TEMPLATE_PATH.append(Path(__file__).parent.parent / "templates")
 static_file_path = Path(__file__).parent.parent / "templates" / "static"
@@ -21,6 +22,17 @@ def interactive_import(
     logger: Logger,
     port: int = 8080,
 ):
+    tag = random_string(6)
+    webbrowser.open(f"http://localhost:{port}?tag={tag}")
+
+    def verify_request():
+        if request.query.get("tag") != tag:
+            bottle.abort(401)
+
+    def render_error(err) -> str:
+        logger.error(err)
+        return jinja2_template("error.html.jinja", err=err)
+
     def run_import(resolutions: ResolutionList) -> str:
         try:
             actions = import_users(
@@ -31,7 +43,7 @@ def interactive_import(
             return jinja2_template("resolve.html.jinja", actions=actions)
         except CatchableADExceptions as e:
             logger.exception("error during import_users")
-            return jinja2_template("error.html.jinja", err=e)
+            return render_error(e)
 
     @bottle.get("/static/<filepath:path>")
     def static(filepath):
@@ -39,10 +51,13 @@ def interactive_import(
 
     @route("/")
     def get_root():
+        verify_request()
         return run_import(resolutions=ResolutionList.load(config.rejected_actions, logger=logger))
 
     @post("/")
     def post_root():
+        verify_request()
+
         # parse the POSTed form values to actual resolution objects
         # the form keys have the format {{idx}}.{{prop}} where all props of one action have the same idx
         resolution_props_by_idx = {}
@@ -54,9 +69,7 @@ def interactive_import(
         try:
             new_resolutions = ResolutionList(resolutions=resolution_props)
         except ValidationError as e:
-            error_msg = format_validation_error(e, source="HTTP POST Form Data")
-            logger.error(error_msg)
-            return jinja2_template("error.html.jinja", err=error_msg)
+            return render_error(format_validation_error(e, source="HTTP POST Form Data"))
 
         # append new resolutions to existing
         resolutions = ResolutionList.load(config.rejected_actions, logger=logger) + new_resolutions
