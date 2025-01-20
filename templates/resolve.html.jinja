@@ -29,7 +29,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>AD Permission Sync</title>
-    <link rel="stylesheet" href="static/normalize.css"></link>
+    <link rel="stylesheet" href="static/normalize.css">
     <style>
         :root {
             --cell-padding: 6px;
@@ -66,14 +66,21 @@
         }
 
         /* custom classes */
-        .actions-table {
-            width: 800px;
-            margin: 20px auto;
+        #container {
+            max-width: 800px;
+            margin: 30px auto;
         }
+        #title {
+            margin-bottom: 0;
+        }
+
         .action-type {
             font-weight: bold;
             border: none;
             padding-top: 1.5em;
+        }
+        .action-type-0 {
+            padding-top: 0;
         }
         .accept-reject-buttons:not(:first-child) {
             margin-top: var(--cell-padding);
@@ -81,135 +88,161 @@
         .password-input, .new-name-input {
             width: 350px;
         }
+        .success {
+            color: green;
+        }
         .error {
             color: red;
         }
     </style>
 </head>
 <body>
-    <table class="actions-table">
-        {% for action in actions %}
-            {% set action_id = loop.index0 %}
-            <form
-                id="{{ action_id }}"
-                action-type="{{ action.type }}"
-                class="action-form"
-                method="post"
-            >
-                {# type independent action attributes #}
-                <tr>
-                    <td class="action-type" colspan="2">
-                        {{ type_descriptions[action.type] }}
-                        <input type="hidden" name="type" value="{{ action.type }}" />
-                    </td>
-                </tr>
-                <tr>
-                    <td>User</td>
-                    <td>
-                        {{ action.user }}
-                        <input type="hidden" name="user" value="{{ action.user }}" />
-                    </td>
-                </tr>
+    <div id="container">
+    <h1 id="title">AD Permission Sync</h1>
+    <div id="state" class="success">interactive session running</div>
 
-                {# type dependent action attributes #}
-                {% if action.type == 'join' %}
+    <div class="running-only">{{ actions | length }} interaction(s) required</div>
+    <div class="running-only">
+        {{ password_count }} password(s) set
+        {% if password_count > 0 %}
+            <a href="/export-passwords?tag={{ tag }}"></a>
+        {% endif %}
+    </div>
+
+    {% if error %}
+        <h3 class="running-only">Error</h3>
+        <pre class="running-only error">{{ error }}</pre>
+    {% endif %}
+
+
+    {% if actions | length > 0 %}
+        <h2 class="running-only">Required Interactions</h2>
+        <table class="running-only">
+            {% for action in actions %}
+                {% set action_id = loop.index0 %}
+                <form
+                    id="{{ action_id }}"
+                    action-type="{{ action.type }}"
+                    class="action-form"
+                    method="post"
+                >
+                    {# type independent action attributes #}
                     <tr>
-                        <td>Group</td>
-                        <td>
-                            {{ action.group }}
-                            <input type="hidden" name="group" value="{{ action.group }}" />
+                        <td class="action-type action-type-{{ action_id }}" colspan="2">
+                            {{ type_descriptions[action.type] }}
+                            <input id="{{ action_id }}.type" type="hidden" name="type" value="{{ action.type }}" />
                         </td>
                     </tr>
-                {% elif action.type == 'name' %}
                     <tr>
-                        <td>User Attributes</td>
-                        <td>{{ dict_table(action.attributes) }}</td>
-                    </tr>
-                    <tr>
-                        <td>Conflict User</td>
-                        <td>{{ action.conflict_user }}</td>
-                    </tr>
-                    <tr>
-                        <td>Conflicting Account Name</td>
+                        <td>User</td>
                         <td>
-                            {{ action.name }}
-                            <input type="hidden" name="name" value="{{ action.name }}" />
+                            {{ action.user }}
+                            <input id="{{ action_id }}.user" type="hidden" name="user" value="{{ action.user }}" />
                         </td>
                     </tr>
-                {% endif %}
 
-                {# action error #}
-                {% if action.error %}
+                    {# type dependent action attributes #}
+                    {% if action.type == 'join' %}
+                        <tr>
+                            <td>Group</td>
+                            <td>
+                                {{ action.group }}
+                                <input id="{{ action_id }}.group" type="hidden" name="group" value="{{ action.group }}" />
+                            </td>
+                        </tr>
+                    {% elif action.type == 'name' %}
+                        <tr>
+                            <td>User Attributes</td>
+                            <td>{{ dict_table(action.attributes) }}</td>
+                        </tr>
+                        <tr>
+                            <td>Conflict User</td>
+                            <td>{{ action.conflict_user }}</td>
+                        </tr>
+                        <tr>
+                            <td>Conflicting Account Name</td>
+                            <td>
+                                {{ action.name }}
+                                <input id="{{ action_id }}.name" type="hidden" name="name" value="{{ action.name }}" />
+                            </td>
+                        </tr>
+                    {% endif %}
+
+                    {# action error #}
+                    {% if action.error %}
+                        <tr>
+                            <td>Previous Error</td>
+                            <td class="error">{{ action.error }}</td>
+                        </tr>
+                    {% endif %}
+
+                    {# interaction #}
                     <tr>
-                        <td>Previous Error</td>
-                        <td class="error">{{ action.error }}</td>
+                        <td>Action</td>
+                        <td>
+
+                            {# type dependent fields #}
+                            {% if action.type == 'enable' %}
+
+                                <label for="{{ action_id }}.password">Password</label>
+                                <input
+                                    id="{{ action_id }}.password"
+                                    class="password-input"
+                                    type="password"
+                                    name="password"
+                                />
+                                <button
+                                    id="{{ action_id }}.show"
+                                    class="password-show-button"
+                                    type="button"
+                                >👁</button>
+                                <button
+                                    id="{{ action_id }}.generate"
+                                    class="password-generate-button"
+                                    type="button"
+                                >🗘</button>
+
+                            {% elif action.type == 'name' %}
+
+                                <label for="{{ action_id }}.new-name">New Name</label>
+                                <input
+                                    id="{{ action_id }}.new-name"
+                                    class="new-name-input"
+                                    type="text"
+                                    name="new_name"
+                                    value="{{ action.input_name }}"
+                                />
+                            {% endif %}
+
+                            {# type independent accept/submit #}
+                            <div class="accept-reject-buttons">
+                                <button
+                                    id="{{ action_id }}.accept"
+                                    class="accept-button"
+                                    type="submit"
+                                    name="accept"
+                                    value="true"
+                                >Accept</button>
+                                <button
+                                    id="{{ action_id }}.reject"
+                                    class="reject-button"
+                                    type="submit"
+                                    name="accept"
+                                    value="false"
+                                >Reject</button>
+                            </div>
+                        </td>
                     </tr>
-                {% endif %}
-
-                {# interaction #}
-                <tr>
-                    <td>Action</td>
-                    <td>
-
-                        {# type dependent fields #}
-                        {% if action.type == 'enable' %}
-
-                            <label for="{{action_id}}.password">Password</label>
-                            <input
-                                id="{{action_id}}.password"
-                                class="password-input"
-                                type="password"
-                                name="password"
-                            />
-                            <button
-                                id="{{action_id}}.show"
-                                class="password-show-button"
-                                type="button"
-                            >👁</button>
-                            <button
-                                id="{{action_id}}.generate"
-                                class="password-generate-button"
-                                type="button"
-                            >🗘</button>
-
-                        {% elif action.type == 'name' %}
-
-                            <label for="{{action_id}}.new-name">New Name</label>
-                            <input
-                                id="{{action_id}}.new-name"
-                                class="new-name-input"
-                                type="text"
-                                name="new_name"
-                                value="{{ action.input_name }}"
-                            />
-                        {% endif %}
-
-                        {# type independent accept/submit #}
-                        <div class="accept-reject-buttons">
-                            <button
-                                id="{{action_id}}.accept"
-                                class="accept-button"
-                                type="submit"
-                                name="accept"
-                                value="true"
-                            >Accept</button>
-                            <button
-                                id="{{action_id}}.reject"
-                                class="reject-button"
-                                type="submit"
-                                name="accept"
-                                value="false"
-                            >Reject</button>
-                        </div>
-                    </td>
-                </tr>
-            </form>
-        {% endfor %}
-        </table>
+                </form>
+            {% endfor %}
+            </table>
+        {% endif %}
+    </div>
 
     <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
         const passwordWordCount = {{ password_word_count or 5 }}
+        const tag = '{{ tag }}'
 
         for (const form of document.getElementsByClassName('action-form')) {
             const actionId = form.id
@@ -237,15 +270,13 @@
 
             } else if (actionType === 'name') {
                 const newNameInput = document.getElementById(actionId + '.new-name')
-                const conflictName = form.querySelector('.accept-button')
+                const conflictName = document.querySelector('.accept-button')
                     {#.getElementsByName('name')#}
                 console.log(conflictName)
                 acceptButton.disabled = true
                 newNameInput.addEventListener('input', () => {
                     acceptButton.disabled = newNameInput.value.length === 0 || newNameInput.value === conflictName
                 })
-
-
             }
         }
 
@@ -261,6 +292,31 @@
             }
             return password
         }
+
+        function showError(message) {
+            let newElement = document.createElement('div')
+            newElement.textContent = message
+            document.getElementById('original').replaceWith(newElement)
+        }
+
+        async function heartbeat() {
+            try {
+                const response = await window.fetch('/heartbeat?tag=' + tag)
+                const timeout = await response.json()
+                window.setTimeout(heartbeat, timeout)
+            } catch (e) {
+                // server is not running anymore
+                console.error(e)
+                const state = document.getElementById('state')
+                state.innerHTML = 'interactive session terminated - you can close this tab now'
+                state.className = 'error'
+                for (const el of Array.from(document.getElementsByClassName('running-only'))) {
+                    el.remove()
+                }
+            }
+        }
+        heartbeat()
+
     </script>
 </body>
 </html>

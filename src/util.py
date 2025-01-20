@@ -1,10 +1,18 @@
+import random
+import string
 from typing import Any
+import threading
+import ctypes
 
 from pydantic import ValidationError
 
 
 def not_none(v: Any) -> bool:
     return v is not None
+
+
+def random_string(length: int, letters: str = string.ascii_letters + string.digits) -> str:
+    return "".join(random.choice(letters) for _ in range(length))
 
 
 def format_validation_error(e: ValidationError, source: str = None, indentation: str = "    ") -> str:
@@ -31,3 +39,20 @@ def format_validation_error(e: ValidationError, source: str = None, indentation:
 
         error_messages.append(message)
     return "\n".join(error_messages)
+
+
+class KillableThread(threading.Thread):
+    def get_id(self):
+        # returns id of the respective thread
+        if hasattr(self, "_thread_id"):
+            return self._thread_id
+        for id, thread in threading._active.items():
+            if thread is self:
+                return id
+
+    def terminate(self):
+        thread_id = self.get_id()
+        res = ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, ctypes.py_object(KeyboardInterrupt))
+        if res > 1:
+            ctypes.pythonapi.PyThreadState_SetAsyncExc(thread_id, 0)
+            print("Exception raise failure")
