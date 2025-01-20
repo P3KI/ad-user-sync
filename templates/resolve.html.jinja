@@ -88,12 +88,10 @@
         .password-input, .new-name-input {
             width: 350px;
         }
-        .success {
-            color: green;
-        }
-        .error {
-            color: red;
-        }
+        .success { color: green; }
+        .warning { color: orange; }
+        .error { color: red; }
+        .hidden { display: none; }
     </style>
 </head>
 <body>
@@ -101,12 +99,13 @@
     <h1 id="title">AD Permission Sync</h1>
     <div id="state" class="success">interactive session running</div>
 
-    <div class="running-only">{{ actions | length }} interaction(s) required</div>
     <div class="running-only">
-        {{ password_count }} password(s) set
-        {% if password_count > 0 %}
-            <a href="/export-passwords?tag={{ tag }}">export</a>
-        {% endif %}
+        <span id="actions-count">{{ actions | length }}</span>  interaction(s) required
+    </div>
+    <div class="running-only">
+        <span id="passwords-count">{{ password_count }}</span> password(s) set
+        <span id="passwords-unexported" class="warning"></span>
+        <a id="passwords-export" href="/export-passwords?tag={{ tag }}" class="hidden">export</a>
     </div>
 
     {% if error %}
@@ -116,8 +115,8 @@
 
 
     {% if actions | length > 0 %}
-        <h2 class="running-only">Required Interactions</h2>
-        <table class="running-only">
+        <h2 class="running-only active-only">Required Interactions</h2>
+        <table class="running-only active-only">
             {% for action in actions %}
                 {% set action_id = loop.index0 %}
                 <form
@@ -126,6 +125,7 @@
                     class="action-form"
                     method="post"
                 >
+                    <input id="{{ action_id }}.tabId" type="hidden" name="tab_id" value="{{ tab_id }}" />
                     {# type independent action attributes #}
                     <tr>
                         <td class="action-type action-type-{{ action_id }}" colspan="2">
@@ -244,8 +244,8 @@
     <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
         const passwordWordCount = {{ password_word_count or 5 }}
-        const tag = '{{ tag }}'
 
+        // setup form validations and user interaction
         for (const form of document.getElementsByClassName('action-form')) {
             const actionId = form.id
             const actionType = form.attributes['action-type'].value
@@ -294,30 +294,52 @@
             return password
         }
 
+        // from here on is tab sync stuff
+
         function showError(message) {
             let newElement = document.createElement('div')
             newElement.textContent = message
             document.getElementById('original').replaceWith(newElement)
         }
 
+        function removeElementByClassName(cls) {
+            for (const el of Array.from(document.getElementsByClassName(cls))) {
+                el.remove()
+            }
+        }
+
+
+        let unexportedPasswords = 0
+        let isActiveTab = true
+        const stateLabel = document.getElementById('state')
+        const passwordCountLabel = document.getElementById('passwords-count')
+        const unexportedLabel = document.getElementById('passwords-unexported')
+        const exportLink = document.getElementById('passwords-export')
         async function heartbeat() {
             try {
-                const response = await window.fetch('/heartbeat?tag=' + tag)
-                const timeout = await response.json()
-                window.setTimeout(heartbeat, timeout)
+                const response = await window.fetch('/heartbeat?tag={{ tag }}&tab={{ tab_id }}')
+                const state = await response.json()
+                unexportedPasswords = state.unexported_passwords
+                passwordCountLabel.innerHTML = state.set_passwords
+                unexportedLabel.innerHTML = unexportedPasswords > 0 ? `(${unexportedPasswords} unexported)` : ''
+                exportLink.className = state.set_passwords > 0 ? '' : 'hidden'
+                isActiveTab = state.is_active_tab
+                if (!isActiveTab) {
+                    stateLabel.innerHTML = 'UI opened in another tab (<a href="/?tag={{ tag }}">continue here</a>)'
+                    stateLabel.className = 'warning'
+                    removeElementByClassName('active-only')
+                }
+                window.setTimeout(heartbeat, state.timeout)
             } catch (e) {
                 // server is not running anymore
                 console.error(e)
-                const state = document.getElementById('state')
-                state.innerHTML = 'interactive session terminated - you can close this tab now'
-                state.className = 'error'
-                for (const el of Array.from(document.getElementsByClassName('running-only'))) {
-                    el.remove()
-                }
+                isActiveTab = false
+                stateLabel.innerHTML = 'interactive import session terminated - you can close this tab now'
+                stateLabel.className = 'error'
+                removeElementByClassName('running-only')
             }
         }
         heartbeat()
-
     </script>
 </body>
 </html>

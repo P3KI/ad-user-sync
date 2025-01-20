@@ -77,7 +77,6 @@ if __name__ == "__main__":
 
         actions = import_users(
             config=config,
-            input_file=args.user_file[0],
             logger=getLogger("import_users"),
         )
 
@@ -92,7 +91,7 @@ if __name__ == "__main__":
             exit(1)
 
         logger = getLogger("interactive")
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.DEBUG)
         interactive_import(
             config=config,
             logger=logger,

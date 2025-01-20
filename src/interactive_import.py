@@ -5,11 +5,12 @@ from datetime import datetime, timedelta
 from logging import Logger
 from pathlib import Path
 from threading import Lock
-from typing import List
+from typing import List, Tuple
 
 from pydantic import ValidationError
 
 from . import ImportConfig, import_users, CatchableADExceptions, Resolution, Action, EnableResolution, EnableAction
+from .import_users import ImportResult
 from .model import ResolutionList, ResolutionParser
 
 from bottle import jinja2_template
@@ -26,21 +27,7 @@ def interactive_import(
     logger: Logger,
     port: int = 8080,
 ):
-    state = InteractiveState()
-
-    def run_import(resolutions: ResolutionList):
-        try:
-            # cache the still required actions in state for logging at eventual termination
-            state.actions = import_users(
-                config=config,
-                resolutions=resolutions,
-                logger=logger.getChild("import_users"),
-            )
-            state.last_error = None
-        except CatchableADExceptions as e:
-            logger.exception("error during import_users")
-            state.last_error = str(e)
-
+    session = InteractiveSession(config=config, logger=logger)
 
     @bottle.get("/static/<filepath:path>")
     def static(filepath):
@@ -48,59 +35,48 @@ def interactive_import(
 
     @bottle.get("/")
     def get_root():
-        state.verify_request()
-        with state:
-            run_import(
-                resolutions=ResolutionList.load(config.rejected_actions, logger=logger)
-            )
-            return state.render_html()
+        session.verify_tag()
+        with session:
+            session.run_import()
+            return session.render_html()
 
     @bottle.post("/")
     def post_root():
-        state.verify_request()
-        with state:
+        session.verify_tag()
+        with session:
             try:
                 new_resolution: Resolution = ResolutionParser.validate_python(bottle.request.forms)
                 logger.info(f"new resolution via POST: {new_resolution.model_dump(exclude={'timestamp'})}")
             except ValidationError as e:
-                return jinja2_template(
-                    "resolve.html.jinja",
-                    actions=state.actions,
-                    tag=state.tag,
-                    password_count=len(state.password_resolutions),
-                    error=format_validation_error(e, source="HTTP POST Form Data"),
-                )
+                session.error = format_validation_error(e, source="HTTP POST Form Data")
+                return session.render_html()
+            session.run_import(new_resolution=new_resolution)
+            return session.render_html()
 
-            # append new resolutions to existing
-            resolutions = ResolutionList.load(config.rejected_actions, logger=logger)
-            # todo
-            resolutions.resolutions.append(new_resolution)
-
-            run_import(resolutions=resolutions)
-
-            if new_resolution.is_rejected:
-                # save rejections to file
-                resolutions.get_rejected().save(config.rejected_actions)
-            elif isinstance(new_resolution, EnableResolution):
-                # remember newly set password in state if it was actually set (means: there is no more enable action)
-                if next(
-                    filter(lambda a: isinstance(a, EnableAction) and a.user == new_resolution.user, state.actions),
-                    None,
-                ) is None:
-                    state.password_resolutions.append(new_resolution)
-
-            return state.render_html()
+    @bottle.get("/export-passwords")
+    def export_passwords():
+        filename = f"new-ad-passwords_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        bottle.response.headers["Content-Type"] = "text/plain"
+        bottle.response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        session.exported_passwords = len(session.set_passwords)
+        return "\n".join(map(":".join, session.set_passwords)) + "\n"
 
     @bottle.get("/heartbeat")
     def beat_heart():
-        state.verify_request()
-        with state:  # requesting state as resource sets last request to now
-            # tell the browser tab to send the next heartbeat in half timeout (as milliseconds)
+        session.verify_tag()
+        with session:  # requesting session as resource sets last request to now
             bottle.response.content_type = "application/json"
-            return json.dumps((state.timeout / 2).total_seconds() * 1000)
+            return json.dumps(dict(
+                # tell the browser tab to send the next heartbeat in half timeout (as milliseconds)
+                timeout=(session.timeout / 2).total_seconds() * 1000,
+                # update the message if passwords have been exported
+                set_passwords=len(session.set_passwords),
+                unexported_passwords=len(session.set_passwords) - session.exported_passwords,
+                is_active_tab=bottle.request.query.get("tab") == session.last_tab_id,
+            ))
 
-    # start the server thread
-    server_thread = KillableThread(
+    # start the bottle thread
+    bottle_thread = KillableThread(
         target=bottle.run,
         kwargs=dict(
             host="localhost",
@@ -108,52 +84,60 @@ def interactive_import(
             quiet=False,
         ),
     )
-    server_thread.start()
-    url = f"http://localhost:{port}?tag={state.tag}"
+    bottle_thread.start()
+    url = f"http://localhost:{port}?tag={session.tag}"
     logger.info(f"Interactive import session started: {url}")
     webbrowser.open(url)
 
     # watch out for terminating events in the main thread
     try:
         while 1:
-            if not server_thread.is_alive():
+            if not bottle_thread.is_alive():
                 # the server thread should not end by itself. this is just for good measure
                 logger.warning("bottle server was stopped somehow")
                 break
-            if not state.is_alive():  # state.is_alive() blocks while there are other requests pending
+            if not session.is_alive():  # state.is_alive() blocks while there are other requests pending
                 logger.debug("all browser tabs closed")
-                server_thread.terminate()
+                bottle_thread.terminate()
                 break
             time.sleep(500)
     except KeyboardInterrupt:
         logger.debug("received keyboard interrupt")
-        server_thread.terminate()
+        bottle_thread.terminate()
 
     logger.info("interactive import ended")
 
     # log the remaining unresolved actions
-    for action in state.actions:
+    for action in session.import_result.required_interactions:
         logger.info(f"action still required: {action.model_dump()}")
 
 
-class InteractiveState:
+class InteractiveSession:
+    config: ImportConfig
+    logger: Logger
     tag: str
     mutex: Lock
-    resolutions: List[EnableResolution]
     timeout: timedelta
 
-    actions: List[Action]
     last_request: datetime | None
-    last_error: str | None = None
+    last_tab_id: str | None
+    set_passwords: List[Tuple[str, str]]
+    exported_passwords: int
 
-    def __init__(self):
+    error: str | None
+    import_result: ImportResult | None
+
+    def __init__(self, config: ImportConfig, logger: Logger):
         self.tag = random_string(6)
+        self.config = config
+        self.logger = logger
         self.timeout = timedelta(seconds=3)
         self.mutex = Lock()
         self.last_request = None
-        self.last_error = None
-        self.actions = []
-        self.password_resolutions = []
+        self.error = None
+        self.import_result = None
+        self.set_passwords = []
+        self.exported_passwords = 0
 
     def is_alive(self) -> bool:
         if self.last_request is None:
@@ -162,21 +146,56 @@ class InteractiveState:
             return datetime.now() - self.last_request <= self.timeout
 
     def __enter__(self):
-        return self.mutex.__enter__()
+        res = self.mutex.__enter__()
+        self.error = None
+        return res
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.last_request = datetime.now()
         self.mutex.__exit__(exc_type, exc_value, traceback)
 
-    def verify_request(self):
+    def verify_tag(self):
         if bottle.request.query.get("tag") != self.tag:
             bottle.abort(401)
 
+    def run_import(self, new_resolution: Resolution | None = None) -> None:
+        resolutions = ResolutionList.load(file=self.config.resolutions_file, logger=self.logger)
+        if new_resolution is not None:
+            resolutions.append(new_resolution)
+        try:
+            self.import_result = import_users(
+                config=self.config,
+                resolutions=resolutions,
+                logger=self.logger.getChild("import_users"),
+            )
+            self.error = None
+        except CatchableADExceptions as e:
+            self.logger.exception("error during import_users")
+            self.import_result = None
+            self.error = str(e)
+            return
+
+        # handle persistence of new_resolution
+        if new_resolution is not None:
+            if new_resolution.is_rejected:
+                # save rejections to file
+                if self.config.resolutions_file is not None:
+                    resolutions.get_rejected().save(self.config.resolutions_file)
+            elif isinstance(new_resolution, EnableResolution):
+                # remember newly set password in state if it was actually set
+                enabled_user = next(filter(lambda u: u.dn == new_resolution.user, self.import_result.enabled), None)
+                if enabled_user is not None:
+                    account_name_attributes = enabled_user.get_attribute("sAMAccountName")
+                    account_name = enabled_user.dn if len(account_name_attributes) != 1 else account_name_attributes[0]
+                    self.set_passwords.append((account_name, new_resolution.password))
+
     def render_html(self) -> str:
+        self.last_tab_id = random_string(6)
         return jinja2_template(
             "resolve.html.jinja",
-            actions=self.actions,
-            password_count=len(self.password_resolutions),
+            actions=self.import_result.required_interactions if self.import_result else [],
+            password_count=len(self.set_passwords),
             tag=self.tag,
-            error=self.last_error,
+            tab_id=self.last_tab_id,
+            error=self.error,
         )
