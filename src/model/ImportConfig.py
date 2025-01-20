@@ -150,14 +150,14 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
-    rejected_actions: Annotated[
+    resolutions_file: Annotated[
         str,
         Field(
-            default="rejections.json",
-            title="Rejected Actions",
+            default="resolutions.json",
+            title="Resolved Interactions",
+            # todo
             description=dedent("""
                 Optional.
-                
                 Specifies the file path to write Interactive Actions into.
                 
                 If the importer can not automatically perform certain actions (See "Interactive Actions" section) 
