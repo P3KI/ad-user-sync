@@ -110,7 +110,6 @@ def import_users(
                 actions.append(EnableAction(user=user.dn))
             elif enable_resolution.accept is True:
                 # resolved action was found and it got accepted
-                # todo handle password requirements error
                 try:
                     user.set_password(enable_resolution.password)
                     user.enable()

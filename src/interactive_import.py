@@ -9,7 +9,7 @@ from typing import List
 
 from pydantic import ValidationError
 
-from . import ImportConfig, import_users, CatchableADExceptions, Resolution, Action, EnableResolution
+from . import ImportConfig, import_users, CatchableADExceptions, Resolution, Action, EnableResolution, EnableAction
 from .model import ResolutionList, ResolutionParser
 
 from bottle import jinja2_template
@@ -28,8 +28,7 @@ def interactive_import(
 ):
     state = InteractiveState()
 
-    def run_import_and_render_response(resolutions: ResolutionList) -> str:
-        error: str | None = None
+    def run_import(resolutions: ResolutionList):
         try:
             # cache the still required actions in state for logging at eventual termination
             state.actions = import_users(
@@ -37,17 +36,11 @@ def interactive_import(
                 resolutions=resolutions,
                 logger=logger.getChild("import_users"),
             )
+            state.last_error = None
         except CatchableADExceptions as e:
             logger.exception("error during import_users")
-            error = str(e)
+            state.last_error = str(e)
 
-        return jinja2_template(
-            "resolve.html.jinja",
-            actions=state.actions,
-            password_count=len(state.password_resolutions),
-            tag=state.tag,
-            error=error,
-        )
 
     @bottle.get("/static/<filepath:path>")
     def static(filepath):
@@ -57,9 +50,10 @@ def interactive_import(
     def get_root():
         state.verify_request()
         with state:
-            return run_import_and_render_response(
+            run_import(
                 resolutions=ResolutionList.load(config.rejected_actions, logger=logger)
             )
+            return state.render_html()
 
     @bottle.post("/")
     def post_root():
@@ -82,11 +76,20 @@ def interactive_import(
             # todo
             resolutions.resolutions.append(new_resolution)
 
-            # save rejections
-            if new_resolution.is_rejected:
-                resolutions.get_rejected().save(config.rejected_actions)
+            run_import(resolutions=resolutions)
 
-            return run_import_and_render_response(resolutions=resolutions)
+            if new_resolution.is_rejected:
+                # save rejections to file
+                resolutions.get_rejected().save(config.rejected_actions)
+            elif isinstance(new_resolution, EnableResolution):
+                # remember newly set password in state if it was actually set (means: there is no more enable action)
+                if next(
+                    filter(lambda a: isinstance(a, EnableAction) and a.user == new_resolution.user, state.actions),
+                    None,
+                ) is None:
+                    state.password_resolutions.append(new_resolution)
+
+            return state.render_html()
 
     @bottle.get("/heartbeat")
     def beat_heart():
@@ -141,12 +144,14 @@ class InteractiveState:
 
     actions: List[Action]
     last_request: datetime | None
+    last_error: str | None = None
 
     def __init__(self):
         self.tag = random_string(6)
         self.timeout = timedelta(seconds=3)
         self.mutex = Lock()
         self.last_request = None
+        self.last_error = None
         self.actions = []
         self.password_resolutions = []
 
@@ -166,3 +171,12 @@ class InteractiveState:
     def verify_request(self):
         if bottle.request.query.get("tag") != self.tag:
             bottle.abort(401)
+
+    def render_html(self) -> str:
+        return jinja2_template(
+            "resolve.html.jinja",
+            actions=self.actions,
+            password_count=len(self.password_resolutions),
+            tag=self.tag,
+            error=self.last_error,
+        )
