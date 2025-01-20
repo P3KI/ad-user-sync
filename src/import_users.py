@@ -5,7 +5,7 @@ from typing import Dict, List, Any, Set, Tuple
 
 from pyad import ADGroup, ADUser, win32Exception, ADContainer
 
-from .active_directory import CatchableADExceptions, CachedActiveDirectory
+from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, Action, NameAction, EnableAction, JoinAction, NameResolution
 from .util import not_none
 
@@ -116,13 +116,15 @@ def import_users(
                     user.enable()
                     logger.info(f"{user}: Was enabled (accepted manually)")
                 except win32Exception as e:
-                    if e.error_info.get("error_code") != '0x800708c5':
+                    if e.error_info.get("error_code") != "0x800708c5":
                         raise
                     logger.warning(f"{user}: Manually provided password does not match requirements")
-                    actions.append(EnableAction(
-                        user=user.dn,
-                        error=e.error_info.get("message", "Password does not meet requirements"),
-                    ))
+                    actions.append(
+                        EnableAction(
+                            user=user.dn,
+                            error=e.error_info.get("message", "Password does not meet requirements"),
+                        )
+                    )
 
             else:
                 # resolved action was found and it got rejected
@@ -172,14 +174,13 @@ def import_users(
                     # resolved action was found and it was accepted
                     new_members.append(user)
                     logger.info(
-                        f'{user}: Not joining group "{group.cn}" '
-                        f'(rejected manually at {join_resolution.timestamp})'
+                        f'{user}: Not joining group "{group.cn}" ' f"(rejected manually at {join_resolution.timestamp})"
                     )
                 else:
                     # resolved action was found and it was rejected
                     logger.info(
                         f'{user}: Not joining restricted group "{group.cn}" '
-                        f'(rejected manually at {join_resolution.timestamp})'
+                        f"(rejected manually at {join_resolution.timestamp})"
                     )
 
             # add the approved members to the group
@@ -227,7 +228,7 @@ def create_user(
         return user, None
     except win32Exception as e:
         # creation failed. check if it was because of a name conflict
-        if e.error_info.get("error_code") != '0x80071392':
+        if e.error_info.get("error_code") != "0x80071392":
             # it was another problem. re-raise exception
             raise
 
