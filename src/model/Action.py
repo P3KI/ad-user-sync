@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import TypeVar, Any, Dict, Literal
+from typing import TypeVar, Any, Dict, Literal, Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 R = TypeVar("R")
 
@@ -11,7 +11,7 @@ R = TypeVar("R")
 class Action(BaseModel, ABC):
     type: str
     user: str
-    error: str | None = None
+    error: Annotated[str | None, Field(default=None, exclude=True)]
 
 
 class EnableAction(Action):
@@ -26,6 +26,6 @@ class JoinAction(Action):
 class NameAction(Action):
     type: Literal["name"] = "name"
     name: str
-    conflict_user: str
-    input_name: str
-    attributes: Dict[str, Any]
+    conflict_user: Annotated[str, Field(exclude=True)]
+    input_name: Annotated[str, Field(exclude=True)]
+    attributes: Annotated[Dict[str, Any], Field(exclude=True)]

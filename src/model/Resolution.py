@@ -4,7 +4,7 @@ from abc import ABC
 from datetime import datetime
 from typing import TypeVar, Annotated, Literal, List, Iterable, Type
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 
 from .FileBaseModel import FileBaseModel
 
@@ -45,6 +45,7 @@ class NameResolution(BaseResolution):
 
 
 Resolution = Annotated[EnableResolution | JoinResolution | NameResolution, Field(discriminator="type")]
+ResolutionParser = TypeAdapter(Resolution)
 
 R = TypeVar("R", bound=Resolution)
 
