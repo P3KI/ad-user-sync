@@ -9,7 +9,7 @@ from typing import List, Tuple
 
 from pydantic import ValidationError
 
-from . import ImportConfig, import_users, CatchableADExceptions, Resolution, Action, EnableResolution, EnableAction
+from . import ImportConfig, import_users, CatchableADExceptions, Resolution, EnableResolution
 from .import_users import ImportResult
 from .model import ResolutionList, ResolutionParser
 
@@ -66,14 +66,16 @@ def interactive_import(
         session.verify_tag()
         with session:  # requesting session as resource sets last request to now
             bottle.response.content_type = "application/json"
-            return json.dumps(dict(
-                # tell the browser tab to send the next heartbeat in half timeout (as milliseconds)
-                timeout=(session.timeout / 2).total_seconds() * 1000,
-                # update the message if passwords have been exported
-                set_passwords=len(session.set_passwords),
-                unexported_passwords=len(session.set_passwords) - session.exported_passwords,
-                is_active_tab=bottle.request.query.get("tab") == session.last_tab_id,
-            ))
+            return json.dumps(
+                dict(
+                    # tell the browser tab to send the next heartbeat in half timeout (as milliseconds)
+                    timeout=(session.timeout / 2).total_seconds() * 1000,
+                    # update the message if passwords have been exported
+                    set_passwords=len(session.set_passwords),
+                    unexported_passwords=len(session.set_passwords) - session.exported_passwords,
+                    is_active_tab=bottle.request.query.get("tab") == session.last_tab_id,
+                )
+            )
 
     # start the bottle thread
     bottle_thread = KillableThread(
