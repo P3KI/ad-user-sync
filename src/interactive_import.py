@@ -81,7 +81,7 @@ def interactive_import(
         kwargs=dict(
             host="localhost",
             port=port,
-            quiet=False,
+            quiet=True,
         ),
     )
     bottle_thread.start()
