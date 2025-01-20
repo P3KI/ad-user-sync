@@ -10,11 +10,31 @@ from .model import ImportConfig, ResolutionList, Action, NameAction, EnableActio
 from .util import not_none
 
 
+class ImportResult:
+    enabled: List[ADUser]
+    created: List[ADUser]
+    updated: List[ADUser]
+    disabled: List[ADUser]
+    required_interactions: List[Action]
+
+    def __init__(self):
+        self.created = []
+        self.enabled = []
+        self.updated = []
+        self.disabled = []
+        self.required_interactions = []
+
+    def require_interaction(self, action: Action):
+        self.required_interactions.append(action)
+
+
 def import_users(
     config: ImportConfig,
     logger: Logger,
     resolutions: ResolutionList = None,
-) -> List[Action]:
+) -> ImportResult:
+    result = ImportResult()
+
     # create an empty resolution list if none is provided
     resolutions = resolutions or ResolutionList()
 
@@ -25,9 +45,6 @@ def import_users(
     group_map: Dict[str, ADGroup] = {
         k: active_directory.get_group(config.full_path(v)) for k, v in config.group_map.items()
     }
-
-    # here we will collect the required interactive actions
-    actions: List[Action] = []
 
     # resolve the config RestrictedGroups form AD
     restricted_groups = [active_directory.get_group(config.full_path(v)) for v in config.restricted_groups]
@@ -72,15 +89,17 @@ def import_users(
                 logger=logger,
             )
             if name_action:
-                actions.append(name_action)
+                result.require_interaction(name_action)
             if user is None:
                 # go to next user to import if creation failed
                 continue
+            result.created.append(user)
         else:
             # update the attributes of existing user
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
             if user_attributes != old_attributes:
                 user.update_attributes(user_attributes)
+                result.updated.append(user)
                 logger.info(f"{user}: Attributes were updated")
 
         # add the user to the list of users, present in the current import list
@@ -101,24 +120,26 @@ def import_users(
             # enabled existing user should be disabled
             user.disable()
             logger.info(f"{user}: Was disabled (disabled attribute set in input file)")
+            result.disabled.append(user)
         elif existing_user_is_disabled:
             # enabling a disabled existing user requires a resolved interactive action
             # we do not enable automatically
             enable_resolution = resolutions.get_enable(user.dn)
             if enable_resolution is None:
                 # no resolved action was found -> add interactive action
-                actions.append(EnableAction(user=user.dn))
+                result.require_interaction(EnableAction(user=user.dn))
             elif enable_resolution.accept is True:
                 # resolved action was found and it got accepted
                 try:
                     user.set_password(enable_resolution.password)
                     user.enable()
+                    result.enabled.append(user)
                     logger.info(f"{user}: Was enabled (accepted manually)")
                 except win32Exception as e:
                     if e.error_info.get("error_code") != "0x800708c5":
                         raise
                     logger.warning(f"{user}: Manually provided password does not match requirements")
-                    actions.append(
+                    result.require_interaction(
                         EnableAction(
                             user=user.dn,
                             error=e.error_info.get("message", "Password does not meet requirements"),
@@ -168,7 +189,7 @@ def import_users(
                 join_resolution = resolutions.get_join(user=user.dn, group=group.dn)
                 if join_resolution is None:
                     # no resolved action was found  -> add interactive action
-                    actions.append(JoinAction(user=user.dn, group=group.dn))
+                    result.require_interaction(JoinAction(user=user.dn, group=group.dn))
                 elif join_resolution.accept is True:
                     # resolved action was found and it was accepted
                     new_members.append(user)
@@ -193,8 +214,9 @@ def import_users(
     for user in removed_users:
         user.disable()
         logger.info(f"{user}: Was disabled (user no longer in import list)")
+        result.disabled.append(user)
 
-    return actions
+    return result
 
 
 def create_user(
