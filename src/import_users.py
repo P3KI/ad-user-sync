@@ -121,7 +121,7 @@ def import_users(
             user.disable()
             logger.info(f"{user}: Was disabled (disabled attribute set in input file)")
             result.disabled.append(user)
-        elif existing_user_is_disabled:
+        elif not disabled and existing_user_is_disabled:
             # enabling a disabled existing user requires a resolved interactive action
             # we do not enable automatically
             enable_resolution = resolutions.get_enable(user.dn)
