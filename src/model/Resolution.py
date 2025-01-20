@@ -59,6 +59,9 @@ class ResolutionList(FileBaseModel):
     def __add__(self, other: ResolutionList) -> ResolutionList:
         return ResolutionList(resolutions=self.resolutions + other.resolutions)
 
+    def append(self, resolution: Resolution) -> None:
+        self.resolutions.append(resolution)
+
     def _filter[R](self, cls: Type[R], user: str) -> Iterable[R]:
         resolutions = reversed(self.resolutions)
         resolutions = filter(lambda r: isinstance(r, cls), resolutions)
