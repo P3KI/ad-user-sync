@@ -190,6 +190,7 @@
                                     class="password-input"
                                     type="password"
                                     name="password"
+                                    autocomplete="off"
                                 />
                                 <button
                                     id="{{ action_id }}.show"
@@ -211,6 +212,7 @@
                                     type="text"
                                     name="new_name"
                                     value="{{ action.input_name }}"
+                                    autocomplete="off"
                                 />
                             {% endif %}
 
@@ -270,8 +272,7 @@
 
             } else if (actionType === 'name') {
                 const newNameInput = document.getElementById(actionId + '.new-name')
-                const conflictName = document.querySelector('.accept-button')
-                    {#.getElementsByName('name')#}
+                const conflictName = document.getElementById(actionId + '.name').value
                 console.log(conflictName)
                 acceptButton.disabled = true
                 newNameInput.addEventListener('input', () => {
