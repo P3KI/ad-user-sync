@@ -1,9 +1,7 @@
 {
     "BasePath" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
     "SearchSubPaths" : [""],
-
     "SearchGroups" : ["CN=Transfer","CN=Test"],
-
     "Attributes":[
               "displayName",
               "givenName",
