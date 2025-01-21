@@ -1,98 +1,66 @@
 #!/usr/bin/env python3
-
 import argparse
-import json
 import logging
-import sys
 from logging import getLogger
 
-from pydantic import BaseModel, ValidationError
 
 arg_parser = argparse.ArgumentParser(
-    prog="UserImport",
+    prog="user_sync.py",
     description="Import/Export Windows ActiveDirectory user accounts",
+    add_help=True,
+    exit_on_error=True,
 )
+subparsers = arg_parser.add_subparsers(dest="command", help="Available commands")
 
-arg_parser.add_argument(
+import_arg_parser = subparsers.add_parser("import", help="Import Users")
+import_arg_parser.add_argument(
     "--config",
-    "-c",
-    default="UserSync.cfg",
+    dest="config_file",
+    default="ImportConfig.json",
     help="Configuration file to use. See README.",
 )
-
-arg_group = arg_parser.add_mutually_exclusive_group(required=True)
-
-arg_group.add_argument(
-    "--export",
-    "-e",
-    "-o",
-    action="store_true",
-    help="Export Mode: File to write user account data to",
-)
-arg_group.add_argument(
-    "--import",
-    "-i",
-    action="store_true",
-    help="Import Mode: File containing the users to import",
-)
-arg_group.add_argument(
+import_arg_parser.add_argument(
     "--interactive",
-    "-r",
     action="store_true",
-    help="Import Mode: File containing the users to import",
-)
-arg_parser.add_argument(
-    "user_file",
-    nargs=1,
-    help="User list file for import/export",
+    help="Start an interactive import session",
 )
 
+export_arg_parser = subparsers.add_parser("export", help="Export Users")
+export_arg_parser.add_argument(
+    "--config",
+    dest="config_file",
+    default="ExportConfig.json",
+    help="Configuration file to use. See README.",
+)
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
 
-    try:
-        with open(args.config, "r") as f:
-            config_json_str = f.read()
-
-    except FileNotFoundError:
-        print(f"Error: Config file '{args.config}' not found.", file=sys.stderr)
-        exit(1)
-
+    # Print Args
     print(f"Args: {args}")
 
-    if args.export:
-        from src.UserExport import UserExporter
+    logger = getLogger(args.command)
+    logger.setLevel(logging.DEBUG)
 
-        exporter = UserExporter(file=args.user_file[0], config=config)
-        exporter.run()
+    if args.command == "import":
+        from src import ImportConfig
 
-    elif vars(args)["import"]:
-        from src import import_users, ImportConfig
+        config = ImportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
 
-        try:
-            config = ImportConfig.load(args.config, logger=getLogger())
-        except ValidationError:
-            exit(1)
+        if args.interactive:
+            from src import interactive_import
 
-        actions = import_users(
-            config=config,
-            logger=getLogger("import_users"),
-        )
+            result = interactive_import(config=config, logger=logger)
+        else:
+            from src import import_users
 
-        print(json.dumps(list(map(BaseModel.model_dump, actions)), indent=4))
+            result = import_users(config=config, logger=logger)
 
-    elif vars(args)["interactive"]:
-        from src import ImportConfig, interactive_import
+        # log the remaining unresolved actions
+        result.log_required_interactions(logger=logger)
+    elif args.command == "export":
+        from src import ExportConfig, export_users
 
-        try:
-            config = ImportConfig.load(args.config, logger=getLogger())
-        except ValidationError:
-            exit(1)
+        config = ExportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
 
-        logger = getLogger("interactive")
-        logger.setLevel(logging.DEBUG)
-        interactive_import(
-            config=config,
-            logger=logger,
-        )
+        export_users(config=config)

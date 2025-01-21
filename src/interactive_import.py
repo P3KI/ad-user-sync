@@ -8,15 +8,13 @@ from threading import Lock
 from typing import List, Tuple
 
 from pydantic import ValidationError
-
-from . import ImportConfig, import_users, CatchableADExceptions, Resolution, EnableResolution
-from .import_users import ImportResult
-from .model import ResolutionList, ResolutionParser
-
 from bottle import jinja2_template
 import bottle
 
-from .util import format_validation_error, random_string, KillableThread
+from .import_users import import_users
+from .active_directory import CatchableADExceptions
+from .model import ResolutionList, ResolutionParser, ImportConfig, ImportResult, Resolution, EnableResolution
+from .util import format_validation_error, random_string, KillableThread, find_free_port
 
 bottle.TEMPLATE_PATH.append(Path(__file__).parent.parent / "templates")
 static_file_path = Path(__file__).parent.parent / "templates" / "static"
@@ -25,8 +23,7 @@ static_file_path = Path(__file__).parent.parent / "templates" / "static"
 def interactive_import(
     config: ImportConfig,
     logger: Logger,
-    port: int = 8080,
-):
+) -> ImportResult:
     session = InteractiveSession(config=config, logger=logger)
 
     @bottle.get("/static/<filepath:path>")
@@ -78,6 +75,7 @@ def interactive_import(
             )
 
     # start the bottle thread
+    port = find_free_port()
     bottle_thread = KillableThread(
         target=bottle.run,
         kwargs=dict(
@@ -108,10 +106,7 @@ def interactive_import(
         bottle_thread.terminate()
 
     logger.info("interactive import ended")
-
-    # log the remaining unresolved actions
-    for action in session.import_result.required_interactions:
-        logger.info(f"action still required: {action.model_dump()}")
+    return session.import_result
 
 
 class InteractiveSession:
@@ -168,7 +163,7 @@ class InteractiveSession:
             self.import_result = import_users(
                 config=self.config,
                 resolutions=resolutions,
-                logger=self.logger.getChild("import_users"),
+                logger=self.logger.getChild("import"),
             )
             self.error = None
         except CatchableADExceptions as e:
