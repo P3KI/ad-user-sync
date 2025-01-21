@@ -6,26 +6,8 @@ from typing import Dict, List, Any, Set, Tuple
 from pyad import ADGroup, ADUser, win32Exception, ADContainer
 
 from .active_directory import CachedActiveDirectory
-from .model import ImportConfig, ResolutionList, Action, NameAction, EnableAction, JoinAction, NameResolution
-from .util import not_none
-
-
-class ImportResult:
-    enabled: List[ADUser]
-    created: List[ADUser]
-    updated: List[ADUser]
-    disabled: List[ADUser]
-    required_interactions: List[Action]
-
-    def __init__(self):
-        self.created = []
-        self.enabled = []
-        self.updated = []
-        self.disabled = []
-        self.required_interactions = []
-
-    def require_interaction(self, action: Action):
-        self.required_interactions.append(action)
+from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
+from .util import not_none, full_path
 
 
 def import_users(
