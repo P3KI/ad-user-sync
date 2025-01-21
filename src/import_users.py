@@ -16,7 +16,6 @@ def import_users(
     resolutions: ResolutionList = None,
 ) -> ImportResult:
     result = ImportResult()
-
     # create an empty resolution list if none is provided
     resolutions = resolutions or ResolutionList()
 
@@ -25,11 +24,11 @@ def import_users(
 
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
-        k: active_directory.get_group(config.full_path(v)) for k, v in config.group_map.items()
+        k: active_directory.get_group(full_path(config.base_path, v)) for k, v in config.group_map.items()
     }
 
     # resolve the config RestrictedGroups form AD
-    restricted_groups = [active_directory.get_group(config.full_path(v)) for v in config.restricted_groups]
+    restricted_groups = [active_directory.get_group(full_path(config.base_path, v)) for v in config.restricted_groups]
 
     # Read users form input file
     with open(config.input_file) as f:
@@ -39,7 +38,7 @@ def import_users(
         logger.info(f"Input: {json.dumps(users_attributes)}")
 
     # The path where all managed users will be created. Defined by ManagedUserPath
-    user_container = active_directory.get_container(config.full_path(config.managed_user_path))
+    user_container = active_directory.get_container(full_path(config.base_path, config.managed_user_path))
 
     # All users imported during this run
     old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
@@ -50,8 +49,8 @@ def import_users(
 
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
-        cn: str = config.prefix_account_name(user_attributes.pop("cn"))  # used as key and for user creation
-        account_name: str = config.prefix_account_name(user_attributes.pop("sAMAccountName"))  # used for user creation
+        cn: str = config.prefix_account_names + user_attributes.pop("cn")  # used as key and for user creation
+        account_name: str = config.prefix_account_names + user_attributes.pop("sAMAccountName")  # used for user creation
         member_of: List[str] = user_attributes.pop("memberOf")  # will be mapped to "member" attribute of groups
         account_expires: str | None = user_attributes.pop("accountExpires", None)  # set via ADUser.set_expiration()
         disabled: bool = user_attributes.pop("disabled", False)  # We only disable via ADUser.disable(), never enable
@@ -88,7 +87,7 @@ def import_users(
         current_users.add(user)
 
         # Set expiration
-        expiration_date = config.get_default_expiration_date()  # has to be at least the default_expiration
+        expiration_date = datetime.now() + config.default_expiration  # has to be at least the default_expiration
         if account_expires:
             # if `accountExpires` from the input file is longer, apply that instead
             account_expires_date = datetime.fromisoformat(account_expires)

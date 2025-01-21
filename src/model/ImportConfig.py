@@ -180,16 +180,3 @@ class ImportConfig(FileBaseModel):
             examples=[False],
         ),
     ]
-
-    def full_path(self, sub_path: str = "") -> str:
-        # Appends the base path to turn a sub_path into a full path (the distinguished name)
-        if len(sub_path) > 0:
-            return sub_path + "," + self.base_path
-        else:
-            return self.base_path
-
-    def prefix_account_name(self, name: str) -> str:
-        return self.prefix_account_names + name
-
-    def get_default_expiration_date(self) -> datetime:
-        return datetime.now() + self.default_expiration
