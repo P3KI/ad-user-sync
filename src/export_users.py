@@ -26,20 +26,22 @@ def export_users(config: ExportConfig):
     def parse_sub_path(v: str) -> str:
         v = config_sub_path(v)  # Remove base path
         pos = v.find(",")
-        return v[pos + 1:] if pos >= 0 else ""  # Remove common name if present
+        return v[pos + 1 :] if pos >= 0 else ""  # Remove common name if present
 
     special_attribute_parsers: Dict[str, AttributeParser] = {
-        'disabled': AttributeParser('disabled', 'userAccountControl', lambda v: (v & 0x02) != 0),
-        'accountExpires': AttributeParser('accountExpires', 'accountExpires', convert_ad_datetime),
+        "disabled": AttributeParser("disabled", "userAccountControl", lambda v: (v & 0x02) != 0),
+        "accountExpires": AttributeParser("accountExpires", "accountExpires", convert_ad_datetime),
         # Filter out the groups sub-path. Cut off the base path that all search results share.
-        'memberOf': AttributeParser('memberOf', 'memberOf', lambda v: list(map(config_sub_path, v))),
-        'subPath': AttributeParser('subPath', 'distinguishedName', parse_sub_path),
+        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(config_sub_path, v))),
+        "subPath": AttributeParser("subPath", "distinguishedName", parse_sub_path),
     }
 
-    attribute_parsers = list(map(
-        lambda key: special_attribute_parsers.get(key, AttributeParser(key)),
-        config.attributes | {"sAMAccountName", "cn", "disabled", "accountExpires", "memberOf"},
-    ))
+    attribute_parsers = list(
+        map(
+            lambda key: special_attribute_parsers.get(key, AttributeParser(key)),
+            config.attributes | {"sAMAccountName", "cn", "disabled", "accountExpires", "memberOf"},
+        )
+    )
     query_attributes = list(map(lambda p: p.source_key, attribute_parsers))
 
     users = []
@@ -67,4 +69,3 @@ def export_users(config: ExportConfig):
 
     with open(config.output_file, "w") as out:
         json.dump(users, out, ensure_ascii=False, indent=4)
-

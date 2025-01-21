@@ -50,7 +50,9 @@ def import_users(
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
         cn: str = config.prefix_account_names + user_attributes.pop("cn")  # used as key and for user creation
-        account_name: str = config.prefix_account_names + user_attributes.pop("sAMAccountName")  # used for user creation
+        account_name: str = config.prefix_account_names + user_attributes.pop(
+            "sAMAccountName"
+        )  # used for user creation
         member_of: List[str] = user_attributes.pop("memberOf")  # will be mapped to "member" attribute of groups
         account_expires: str | None = user_attributes.pop("accountExpires", None)  # set via ADUser.set_expiration()
         disabled: bool = user_attributes.pop("disabled", False)  # We only disable via ADUser.disable(), never enable

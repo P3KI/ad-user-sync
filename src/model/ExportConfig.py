@@ -88,16 +88,6 @@ class ExportConfig(FileBaseModel):
                 These are `sAMAccountName`, `cn`, `disabled`, `accountExpires`, `memberOf`.
                 Additional attributes should be specified to transfer more information of the users between domains.
             """),
-            examples=[[
-               "displayName",
-               "givenName",
-               "sn",
-               "mail",
-               "c",
-               "l",
-               "company",
-               "department"
-            ]],
+            examples=[["displayName", "givenName", "sn", "mail", "c", "l", "company", "department"]],
         ),
     ]
-

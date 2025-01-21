@@ -85,11 +85,11 @@ def full_path(base_path: str, path: str = ""):
 
 # Removes the base path to turn a distinguished name into a relative path
 def sub_path(base_path: str, dn: str) -> str:
-    return dn[0: -len(base_path) - 1] if dn.endswith(base_path) else dn
+    return dn[0 : -len(base_path) - 1] if dn.endswith(base_path) else dn
 
 
 def find_free_port() -> int:
     with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
