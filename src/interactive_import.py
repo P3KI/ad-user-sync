@@ -133,7 +133,7 @@ def interactive_import(
 
     watch_terminating_events()
 
-    bottle_thread.join()
+    bottle_thread.join(timeout=5)
     logger.info("session ended")
     return session.result
 
