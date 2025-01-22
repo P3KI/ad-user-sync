@@ -39,8 +39,20 @@ if __name__ == "__main__":
     # Print Args
     print(f"Args: {args}")
 
-    logger = getLogger(args.command)
+    logger = getLogger()
     logger.setLevel(logging.DEBUG)
+    for handler in logger.handlers:
+        logger.removeHandler(handler)
+
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(
+        logging.Formatter(
+            fmt="%(asctime)s | %(name)-11s | %(levelname)-8s | %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+    )
+    logger.addHandler(console_handler)
 
     if args.command == "import":
         from src import ImportConfig
