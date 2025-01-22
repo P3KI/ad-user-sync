@@ -37,9 +37,6 @@ export_arg_parser.add_argument(
 if __name__ == "__main__":
     args = arg_parser.parse_args()
 
-    # Print Args
-    print(f"Args: {args}")
-
     logger = getLogger()
     logger.setLevel(logging.DEBUG)
     for handler in logger.handlers:
@@ -94,10 +91,10 @@ if __name__ == "__main__":
         config = ExportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
 
         users = export_users(config=config)
-        if config.output_file:
-            with open(config.output_file, "w") as f:
-                json.dump(users, f, ensure_ascii=False, indent=4)
-        else:
-            print(json.dumps(users, ensure_ascii=False, indent=4))
+        # if config.output_file:
+        #     with open(config.export_file, "w") as f:
+        #         json.dump(users, f, ensure_ascii=False, indent=4)
+        # else:
+        print(json.dumps(users, ensure_ascii=False, indent=4))
 
     exit(0)

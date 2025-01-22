@@ -195,12 +195,23 @@ class InteractiveImportConfig(ImportConfig):
     ]
 
     heartbeat_interval: Annotated[
-        float | None,
+        float,
         Field(
             default=2,
             title="Heartbeat Interval",
-            description="Interval of the heartbeat a browser tab sends in seconds. `null` deactivates tab sync.",
-            examples=[2, None],
+            description="Interval of the heartbeat a browser tab sends in seconds. `0` deactivates tab sync.",
+            examples=[2, 0],
             le=10,
+            ge=0,
+        ),
+    ]
+
+    terminate_on_tab_close: Annotated[
+        bool,
+        Field(
+            default=True,
+            title="Terminate On Tab Close",
+            description="Whether or not the import session should terminate when all browser tabs are closed.",
+            examples=[True, False],
         ),
     ]

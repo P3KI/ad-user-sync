@@ -68,7 +68,7 @@ def interactive_import(
             return json.dumps(
                 dict(
                     # tell the browser tab to send the next heartbeat in half timeout (as milliseconds)
-                    timeout=config.heartbeat_interval * 1000 if config.heartbeat_interval is not None else None,
+                    timeout=config.heartbeat_interval * 1000 if config.heartbeat_interval > 0 else None,
                     # update the message if passwords have been exported
                     set_passwords=len(session.set_passwords),
                     unexported_passwords=session.unexported_passwords,
@@ -94,33 +94,38 @@ def interactive_import(
     # watch out for terminating events in the main thread
     def watch_terminating_events():
         try:
-            tabs_closed_while_unexported = False  # used to only show console warning once
+            tabs_closed_message_logged = False
             while 1:
                 if not bottle_thread.is_alive():
                     # the server thread should not end by itself. this is just for good measure
                     logger.warning("bottle server was stopped somehow")
                     break
                 if not session.is_alive():  # state.is_alive() blocks while there are other requests pending
-                    if session.unexported_passwords > 0:
-                        if not tabs_closed_while_unexported:
+                    if not tabs_closed_message_logged:
+                        logger.debug("all browser tabs closed")
+
+                    if config.terminate_on_tab_close:
+                        if session.unexported_passwords == 0:
+                            bottle_thread.terminate()
+                            return
+                        elif not tabs_closed_message_logged:
                             logger.warning(
                                 f"all browser tabs closed, but there are unexported passwords "
                                 f"(open {url} to export passwords)"
                             )
-                            tabs_closed_while_unexported = True
-                    else:
-                        logger.debug("all browser tabs closed")
-                        bottle_thread.terminate()
-                        break
+                    tabs_closed_message_logged = True
                 else:
-                    tabs_closed_while_unexported = False
+                    tabs_closed_message_logged = False
                     if session.unexported_passwords == 0:
                         session.interrupted_while_unexported = False
                 time.sleep(0.5)
         except KeyboardInterrupt:
             logger.debug("received keyboard interrupt")
-            if len(session.set_passwords) > 0 and not session.interrupted_while_unexported:
-                logger.warning(f"Are you sure? There are unexported passwords (interrupt again to exit)")
+            if session.unexported_passwords > 0 and not session.interrupted_while_unexported:
+                logger.warning(
+                    f"Are you sure? There are unexported passwords "
+                    f"(interrupt again to exit or open {url} to export passwords)"
+                )
                 session.interrupted_while_unexported = True
                 watch_terminating_events()
             else:
@@ -159,12 +164,12 @@ class InteractiveSession:
         self.tag = random_string(6)
         self.mutex = Lock()
         self.timeout = None
-        if self.config.heartbeat_interval is not None:
+        if self.config.heartbeat_interval > 0:
             self.timeout = timedelta(seconds=self.config.heartbeat_interval * 1.5)
 
         self.error = None
         self.result = ImportResult()
-        self.set_passwords = []
+        self.set_passwords = [("asdf", "<PASSWORD>")]
         self.last_request = None
         self.last_tab_id = None
         self.current_result_rendered = True
@@ -222,10 +227,10 @@ class InteractiveSession:
                     resolutions.get_rejected().save(self.config.resolutions_file)
             elif isinstance(new_resolution, EnableResolution):
                 # remember newly set password in state if it was actually set
-                enabled_user = next(filter(lambda u: u.dn == new_resolution.user, self.result.enabled), None)
+                enabled_user = next(filter(lambda u: u.cn == new_resolution.user, self.result.enabled), None)
                 if enabled_user is not None:
                     account_name_attributes = enabled_user.get_attribute("sAMAccountName")
-                    account_name = enabled_user.dn if len(account_name_attributes) != 1 else account_name_attributes[0]
+                    account_name = enabled_user.cn if len(account_name_attributes) != 1 else account_name_attributes[0]
                     self.set_passwords.append((account_name, new_resolution.password))
 
     def render_import_result(self) -> str:

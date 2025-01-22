@@ -321,7 +321,7 @@
                     stateLabel.className = 'warning'
                     removeElementByClassName('active-only')
                 }
-                window.setTimeout(heartbeat, state.timeout)
+                if (state.timeout && state.timeout > 0) window.setTimeout(heartbeat, state.timeout)
             } catch (e) {
                 // server is not running anymore
                 console.error(e)
