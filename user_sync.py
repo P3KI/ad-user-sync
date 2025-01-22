@@ -61,6 +61,7 @@ if __name__ == "__main__":
                 config=InteractiveImportConfig.load(
                     file=args.config_file,
                     logger=logger,
+                    fallback_default=False,
                     exit_on_fail=True,
                 ),
                 logger=logger,
@@ -70,7 +71,7 @@ if __name__ == "__main__":
             from src import import_users, ImportConfig, ResolutionList
 
             logger.name = "import"
-            config = ImportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
+            config = ImportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
             result = import_users(
                 config=config,
                 logger=logger,
@@ -88,7 +89,7 @@ if __name__ == "__main__":
         from src import ExportConfig, export_users
 
         logger.name = "export"
-        config = ExportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
+        config = ExportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
 
         users = export_users(config=config)
         # if config.output_file:

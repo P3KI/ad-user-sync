@@ -14,6 +14,7 @@ class FileBaseModel(BaseModel):
         file: str,
         logger: Logger,
         exit_on_fail: bool = False,
+        fallback_default: bool = True,
         save_default: bool = False,
     ) -> T:
         file = Path(file).absolute()
@@ -30,9 +31,24 @@ class FileBaseModel(BaseModel):
                         else:
                             raise
                 else:
-                    logger.debug(f"File {file} is empty. Continue with default {cls.__name__}.")
+                    if fallback_default:
+                        logger.debug(f"File {file} is empty. Continue with default {cls.__name__}.")
+                    else:
+                        logger.warning(f"File {file} is empty. Can not load {cls.__name__}.")
+                        if exit_on_fail:
+                            exit(1)
+                        else:
+                            raise FileNotFoundError()
         else:
-            logger.debug(f"File {file} does not exist. Continue with default {cls.__name__}.")
+            if fallback_default:
+                logger.debug(f"File {file} does not exist. Continue with default {cls.__name__}.")
+            else:
+                logger.warning(f"File {file} does not exist. Can not load {cls.__name__}.")
+                if exit_on_fail:
+                    exit(1)
+                else:
+                    raise FileNotFoundError()
+
         instance = cls()
         if save_default:
             instance.save(file)
