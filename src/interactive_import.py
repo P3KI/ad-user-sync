@@ -16,8 +16,8 @@ from .active_directory import CatchableADExceptions
 from .model import ResolutionList, ResolutionParser, ImportResult, Resolution, EnableResolution, InteractiveImportConfig
 from .util import format_validation_error, random_string, KillableThread, find_free_port
 
-bottle.TEMPLATE_PATH.append(Path(__file__).parent.parent / "templates")
-static_file_path = Path(__file__).parent.parent / "templates" / "static"
+bottle.TEMPLATE_PATH.append(Path("templates"))
+static_file_path = Path("templates/static")
 
 
 def interactive_import(
@@ -44,7 +44,7 @@ def interactive_import(
         with session:
             try:
                 new_resolution: Resolution = ResolutionParser.validate_python(bottle.request.forms)
-                logger.info(f"new resolution via POST: {new_resolution.model_dump(exclude={'timestamp'})}")
+                logger.debug(f"new resolution via POST: {new_resolution.model_dump(exclude={'timestamp'})}")
             except ValidationError as e:
                 session.error = format_validation_error(e, source="HTTP POST Form Data")
                 return session.render_import_result()
