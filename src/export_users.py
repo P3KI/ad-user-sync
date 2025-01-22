@@ -4,7 +4,7 @@ from typing import Any, Dict, Callable
 from pyad import ADQuery
 import json
 
-
+from . import CachedActiveDirectory
 from .model import ExportConfig
 from .util import convert_ad_datetime, full_path, sub_path
 
@@ -19,12 +19,17 @@ class AttributeParser:
         self.source_key = source_key if source_key is not None else key
         self.parse = parse
 
+    def apply(self, source: Dict[str, Any], target: Dict[str, Any]):
+        val = source.get(self.source_key)
+        target[self.target_key] = self.parse(source[self.source_key]) if val is not None else None
+
 
 def export_users(config: ExportConfig):
-    config_sub_path = partial(sub_path, config.base_path)
+    confed_sub_path = partial(sub_path, config.base_path)
+    confed_full_path = partial(full_path, config.base_path)
 
     def parse_sub_path(v: str) -> str:
-        v = config_sub_path(v)  # Remove base path
+        v = confed_sub_path(v)  # Remove base path
         pos = v.find(",")
         return v[pos + 1 :] if pos >= 0 else ""  # Remove common name if present
 
@@ -32,7 +37,7 @@ def export_users(config: ExportConfig):
         "disabled": AttributeParser("disabled", "userAccountControl", lambda v: (v & 0x02) != 0),
         "accountExpires": AttributeParser("accountExpires", "accountExpires", convert_ad_datetime),
         # Filter out the groups sub-path. Cut off the base path that all search results share.
-        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(config_sub_path, v))),
+        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(confed_sub_path, v))),
         "subPath": AttributeParser("subPath", "distinguishedName", parse_sub_path),
     }
 
@@ -42,26 +47,25 @@ def export_users(config: ExportConfig):
             config.attributes | {"sAMAccountName", "cn", "disabled", "accountExpires", "memberOf"},
         )
     )
-    query_attributes = list(map(lambda p: p.source_key, attribute_parsers))
+
+    # create a cached active directory instance for accessing AD
+    active_directory = CachedActiveDirectory()
+
+    query_groups = tuple(map(confed_full_path, config.search_groups))
+    query_attributes = tuple(map(lambda p: p.source_key, attribute_parsers))
 
     users = []
-    for search_path in config.sub_paths:
-        user_filter = "objectClass = 'user'"
-        if len(config.search_groups) > 0:
-            group_dns = map(lambda g: f"memberOf='{full_path(config.base_path, g)}'", config.search_groups)
-            user_filter += f" AND ({' OR '.join(group_dns)})"
-
-        query = ADQuery()
-        query.execute_query(
+    for search_path in map(confed_full_path, config.search_sub_paths or [""]):
+        users_attributes = active_directory.find_users_attributes(
             attributes=query_attributes,
-            where_clause=user_filter,
-            base_dn=full_path(config.base_path, search_path),
+            groups=query_groups,
+            base_dn=search_path,
         )
 
-        for row in query.get_results():
+        for user_attributes in users_attributes:
             user = {}
             for parser in attribute_parsers:
-                user[parser.target_key] = parser.parse(row[parser.source_key])
+                parser.apply(user_attributes, user)
             users.append(user)
 
     return users
