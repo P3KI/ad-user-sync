@@ -88,7 +88,7 @@ def interactive_import(
     )
     bottle_thread.start()
     url = f"http://localhost:{port}?tag={session.tag}"
-    logger.info(f"Interactive import session started: {url}")
+    logger.info(f"session started: {url}")
     webbrowser.open(url)
 
     # watch out for terminating events in the main thread
@@ -199,10 +199,12 @@ class InteractiveSession:
         if new_resolution is not None:
             resolutions.append(new_resolution)
         try:
-            self.import_result = import_users(
-                config=self.config,
-                resolutions=resolutions,
-                logger=self.logger.getChild("import"),
+            self.result.update(
+                import_users(
+                    config=self.config,
+                    resolutions=resolutions,
+                    logger=self.logger.getChild("import"),
+                )
             )
             self.error = None
             self.current_result_rendered = False

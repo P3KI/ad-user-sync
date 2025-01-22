@@ -62,7 +62,7 @@ def import_users(
         # Create user or update user attributes
         user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
         if user is None:
-            user, name_action = create_user(
+            user = create_user(
                 cn=cn,
                 account_name=account_name,
                 user_attributes=user_attributes,
@@ -70,20 +70,18 @@ def import_users(
                 active_directory=active_directory,
                 user_container=user_container,
                 logger=logger,
+                result=result,
             )
-            if name_action:
-                result.require_interaction(name_action)
             if user is None:
                 # go to next user to import if creation failed
                 continue
-            result.created.append(user)
         else:
             # update the attributes of existing user
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
             if user_attributes != old_attributes:
                 user.update_attributes(user_attributes)
-                result.updated.append(user)
-                logger.info(f"{user}: Attributes were updated")
+                result.add_updated(user)
+                logger.info(f"{user.cn}: Attributes were updated")
 
         # add the user to the list of users, present in the current import list
         current_users.add(user)
@@ -102,36 +100,36 @@ def import_users(
         if disabled and not existing_user_is_disabled:
             # enabled existing user should be disabled
             user.disable()
-            logger.info(f"{user}: Was disabled (disabled attribute set in input file)")
-            result.disabled.append(user)
+            logger.info(f"{user.cn}: Was disabled (disabled attribute set in input file)")
+            result.add_disabled(user)
         elif not disabled and existing_user_is_disabled:
             # enabling a disabled existing user requires a resolved interactive action
             # we do not enable automatically
-            enable_resolution = resolutions.get_enable(user.dn)
+            enable_resolution = resolutions.get_enable(user.cn)
             if enable_resolution is None:
                 # no resolved action was found -> add interactive action
-                result.require_interaction(EnableAction(user=user.dn))
+                result.require_interaction(EnableAction(user=user.cn))
             elif enable_resolution.accept is True:
                 # resolved action was found and it got accepted
                 try:
                     user.set_password(enable_resolution.password)
                     user.enable()
-                    result.enabled.append(user)
-                    logger.info(f"{user}: Was enabled (accepted manually)")
+                    result.add_enabled(user)
+                    logger.info(f"{user.cn}: Was enabled (accepted manually)")
                 except win32Exception as e:
                     if e.error_info.get("error_code") != "0x800708c5":
                         raise
-                    logger.warning(f"{user}: Manually provided password does not match requirements")
+                    logger.debug(f"{user.cn}: Manually provided password does not match requirements")
                     result.require_interaction(
                         EnableAction(
-                            user=user.dn,
+                            user=user.cn,
                             error=e.error_info.get("message", "Password does not meet requirements"),
                         )
                     )
 
             else:
                 # resolved action was found and it got rejected
-                logger.info(f"{user}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
+                logger.debug(f"{user.cn}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
 
         # Add user as a member to managed groups for later processing
         # We can't set group membership fora user directly, instead we have to set user members for groups.
@@ -152,7 +150,8 @@ def import_users(
         if len(removed_members) > 0:
             group.remove_members(removed_members)
             for user in removed_members:
-                logger.info(f'{user}: Removed from group "{group.cn}" (membership not present in import list)')
+                logger.info(f'{user.cn}: Removed from group "{group.cn}" (membership not present in import list)')
+                result.add_left(user, group)
 
         # add members to group that haven't been members before
         if group not in restricted_groups:
@@ -161,7 +160,8 @@ def import_users(
             if len(new_members) > 0:
                 group.add_members(new_members)
                 for user in new_members:
-                    logger.info(f'{user}: Joined group "{group.cn}"')
+                    logger.info(f'{user.cn}: Joined group "{group.cn}"')
+                    result.add_joined(user, group)
         else:
             # joining a restricted group requires a resolved interactive action
             new_members = []
@@ -169,20 +169,17 @@ def import_users(
             # filter the users that are accepted in the restricted group
             for user in current_group_members - old_members:
                 # see if there is a resolved action
-                join_resolution = resolutions.get_join(user=user.dn, group=group.dn)
+                join_resolution = resolutions.get_join(user=user.cn, group=group.cn)
                 if join_resolution is None:
                     # no resolved action was found  -> add interactive action
-                    result.require_interaction(JoinAction(user=user.dn, group=group.dn))
+                    result.require_interaction(JoinAction(user=user.cn, group=group.cn))
                 elif join_resolution.accept is True:
                     # resolved action was found and it was accepted
                     new_members.append(user)
-                    logger.info(
-                        f'{user}: Not joining group "{group.cn}" ' f"(rejected manually at {join_resolution.timestamp})"
-                    )
                 else:
                     # resolved action was found and it was rejected
-                    logger.info(
-                        f'{user}: Not joining restricted group "{group.cn}" '
+                    logger.debug(
+                        f'{user.cn}: Not joining restricted group "{group.cn}" '
                         f"(rejected manually at {join_resolution.timestamp})"
                     )
 
@@ -190,14 +187,15 @@ def import_users(
             if len(new_members) > 0:
                 group.add_members(new_members)
                 for user in new_members:
-                    logger.info(f'{user}: Joined restricted group "{group.cn}" (accepted manually)')
+                    logger.info(f'{user.cn}: Joined restricted group "{group.cn}" (accepted manually)')
+                    result.add_joined(user, group)
 
     # Disable users currently in AD but not in current import list
     removed_users = old_users - current_users
     for user in removed_users:
         user.disable()
-        logger.info(f"{user}: Was disabled (user no longer in import list)")
-        result.disabled.append(user)
+        logger.info(f"{user.cn}: Was disabled (user no longer in import list)")
+        result.add_disabled(user)
 
     return result
 
@@ -210,7 +208,8 @@ def create_user(
     active_directory: CachedActiveDirectory,
     user_container: ADContainer,
     logger: Logger,
-) -> Tuple[ADUser | None, NameAction | None]:
+    result: ImportResult,
+) -> ADUser | None:
     # check if there should be a renaming applied for this user
     if name_resolution is not None and name_resolution.is_accepted:
         new_account_name = name_resolution.new_name
@@ -224,12 +223,14 @@ def create_user(
             enable=False,
             optional_attributes=user_attributes | {"sAMAccountName": new_account_name},
         )
+        result.add_created(user)
         if account_name == new_account_name:
-            logger.info(f"{user}: Was created")
+            logger.info(f"{user.cn}: Was created")
         else:
-            logger.info(f"{user}: Was created with renamed account name ({account_name} -> {new_account_name})")
+            logger.info(f"{user.cn}: Was created with renamed account name ({account_name} -> {new_account_name})")
 
-        return user, None
+        return user
+
     except win32Exception as e:
         # creation failed. check if it was because of a name conflict
         if e.error_info.get("error_code") != "0x80071392":
@@ -256,7 +257,7 @@ def create_user(
             # edge case:
             if conflict_user is None:
                 # seems that the original account name is available in the meantime
-                logger.warning(
+                logger.debug(
                     f"Account renaming applied for {cn} ({account_name} -> {new_account_name}) "
                     f"which gave another name conflict. But the original account name seems to be "
                     f"available in the meantime."
@@ -269,15 +270,19 @@ def create_user(
                     active_directory=active_directory,
                     user_container=user_container,
                     logger=logger,
+                    result=result,
                 )
 
-            previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.dn})."
+            previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
 
-        return None, NameAction(
-            user=cn,
-            attributes=user_attributes,
-            name=account_name,
-            input_name=new_account_name,
-            conflict_user=conflict_user.dn,
-            error=previous_error,
+        result.require_interaction(
+            NameAction(
+                user=cn,
+                attributes=user_attributes,
+                name=account_name,
+                input_name=new_account_name,
+                conflict_user=conflict_user.cn,
+                error=previous_error,
+            )
         )
+        return None
