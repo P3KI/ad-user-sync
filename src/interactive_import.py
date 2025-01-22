@@ -169,7 +169,7 @@ class InteractiveSession:
 
         self.error = None
         self.result = ImportResult()
-        self.set_passwords = [("asdf", "<PASSWORD>")]
+        self.set_passwords = []
         self.last_request = None
         self.last_tab_id = None
         self.current_result_rendered = True
