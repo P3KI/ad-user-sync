@@ -5,6 +5,8 @@ import logging
 import sys
 from logging import getLogger
 
+from src.util import document_model
+from src import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users
 
 arg_parser = argparse.ArgumentParser(
     prog="user_sync.exe",
@@ -14,12 +16,17 @@ arg_parser = argparse.ArgumentParser(
 )
 subparsers = arg_parser.add_subparsers(dest="command", help="Available commands")
 
-import_arg_parser = subparsers.add_parser("import", help="Import Users")
+import_arg_parser = subparsers.add_parser(
+    name="import",
+    help="Import Users",
+    epilog=f"The CONFIG_FILE should contain a JSON object with the following values:\n\n{document_model(InteractiveImportConfig)}",
+    formatter_class=argparse.RawTextHelpFormatter,
+)
 import_arg_parser.add_argument(
     "--config",
     dest="config_file",
     default="import_config.json",
-    help="Configuration file to use. See README.",
+    help="Configuration file to use.",
 )
 import_arg_parser.add_argument(
     "--interactive",
@@ -27,7 +34,12 @@ import_arg_parser.add_argument(
     help="Start an interactive import session",
 )
 
-export_arg_parser = subparsers.add_parser("export", help="Export Users")
+export_arg_parser = subparsers.add_parser(
+    name="export",
+    help="Export Users",
+    epilog=f"The CONFIG_FILE should contain a JSON object with the following values:\n\n{document_model(ExportConfig)}",
+    formatter_class=argparse.RawTextHelpFormatter,
+)
 export_arg_parser.add_argument(
     "--config",
     dest="config_file",
@@ -55,8 +67,6 @@ if __name__ == "__main__":
 
     if args.command == "import":
         if args.interactive:
-            from src import interactive_import, InteractiveImportConfig
-
             logger.name = "interactive"
             result = interactive_import(
                 config=InteractiveImportConfig.load(
@@ -69,8 +79,6 @@ if __name__ == "__main__":
             )
 
         else:
-            from src import import_users, ImportConfig, ResolutionList
-
             logger.name = "import"
             config = ImportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
             result = import_users(
@@ -87,8 +95,6 @@ if __name__ == "__main__":
         # write the result to stdout
         print(result.model_dump_json(indent=4))
     elif args.command == "export":
-        from src import ExportConfig, export_users
-
         logger.name = "export"
         config = ExportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
 

@@ -1,13 +1,16 @@
+import json
 import random
 import string
-from typing import Any
+import textwrap
+from typing import Any, Type
 import threading
 import ctypes
 import socket
 from contextlib import closing
+from textwrap import dedent, indent
 
 from pyad import pyadutils
-from pydantic import ValidationError
+from pydantic import ValidationError, BaseModel
 
 
 def not_none(v: Any) -> bool:
@@ -93,3 +96,33 @@ def find_free_port() -> int:
         s.bind(("", 0))
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         return s.getsockname()[1]
+
+
+def document_model(model: Type[BaseModel]) -> str:
+    schema = model.model_json_schema()
+    doc = ""
+    for field, props in schema["properties"].items():
+        required = field in schema["required"]
+
+        doc += f"[{field}] - {props.get('title')}"
+        if required:
+            doc += f" - REQUIRED"
+        doc += "\n"
+
+        doc += textwrap.indent(dedent(props.get("description", "").strip()), "  ") + "\n"
+        doc += f"    type:    {props.get('type')}"
+        if "format" in props:
+            doc += f" ({props['format']})"
+        doc += "\n"
+
+        if "default" in props:
+            doc += f"    default: {json.dumps(props['default'], indent=2)}\n"
+        elif not required:
+            doc += f"    default: null\n"
+
+        if "examples" in props:
+            for example in props["examples"]:
+                if example != props.get("default"):
+                    doc += f"    example: {indent(json.dumps(example, indent=2), '             ').strip()}\n"
+        doc += "\n"
+    return doc

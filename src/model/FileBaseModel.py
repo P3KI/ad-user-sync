@@ -12,7 +12,7 @@ class FileBaseModel(BaseModel):
     @classmethod
     def load[T](
         cls: Type[T],
-        file: str,
+        file: str | Path,
         logger: Logger,
         exit_on_fail: bool = False,
         fallback_default: bool = True,

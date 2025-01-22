@@ -12,12 +12,8 @@ class ExportConfig(FileBaseModel):
         Path,
         Field(
             title="Export File",
-            description=dedent("""
-                Mandatory.
-
-                Specifies the user list file for export.
-            """),
-            examples=["Users.json"],
+            description="Path to the user list file for export.",
+            examples=["users.json"],
         ),
     ]
 
@@ -26,14 +22,9 @@ class ExportConfig(FileBaseModel):
         Field(
             title="Base Path",
             description=dedent("""
-                Mandatory.
-
-                Specifies the distinguished name ("dn") of the location in the active directory under which
-                all users and groups are located. If all users and groups are in one place it can be directly specified
-                here.
-                
-                If not `BasePath` should point to the longest parent path shared by all users and the optional `SearchSubPaths`
-                option should be used to restrict the recursive search for users.
+                Specifies the distinguished name ("dn") of the location in the active directory under which all users and groups are located.
+                If not all users and groups are in one place `base_path` should point to the longest parent path shared by all users 
+                and the optional `search_sub_paths` option should be used to restrict the recursive search for users.
             """),
             examples=["CN=Users,DC=ad,DC=company,DC=com"],
         ),
@@ -45,14 +36,10 @@ class ExportConfig(FileBaseModel):
             title="Search Groups",
             default_factory=list,
             description=dedent("""
-                Mandatory.
-
                 Specifies which security groups a users must be a member of to be included in the export.
                 If multiple groups are specified, membership in any of these groups is sufficient.
-                Group object paths are relative to `BasePath` and are prepended to form a full dn.
-                
-                A value of `null` is possible to export all users found regardless of group membership.
-                This is only recommended if `SearchSubPaths` restricts the user search sufficiently.  
+                Group object paths are relative to `base_path` and are prepended to form a full dn.
+                If not provided all users regardless of group membership are exported (make sure `search_sub_paths` restrictive enough).  
             """),
             examples=[["CN=Transfer", "CN=Test"]],
         ),
@@ -64,13 +51,8 @@ class ExportConfig(FileBaseModel):
             title="Attributes",
             default_factory=set,
             description=dedent("""
-                Optional (but recommended).
-
-                Specifies which attributes of user objects are written to the output file.
-                
-                Some attributes are always exported because they are needed for the import script to work. 
-                These are `sAMAccountName`, `cn`, `disabled`, `accountExpires`, `memberOf`.
-                Additional attributes should be specified to transfer more information of the users between domains.
+                Which additional attributes of user objects should be written to the output file to transfer more information of the users between domains.
+                The attributes `sAMAccountName`, `cn`, `disabled`, `accountExpires`, `memberOf` are exported regardless.
             """),
             examples=[["displayName", "givenName", "sn", "mail", "c", "l", "company", "department"]],
         ),
@@ -82,11 +64,9 @@ class ExportConfig(FileBaseModel):
             default=None,
             title="Search Sub-Paths",
             description=dedent("""
-                Optional.
-
-                Specifies relative paths to search for user objects in the AD. 
-                Use in case not all of `BasePath` should be searched recursively. 
-                This sub paths are prepended to `BasePath` for user search queries to form a full dn.
+                Relative paths to search for user objects in the AD. 
+                Use in case not all of `base_path` should be searched recursively. 
+                This sub paths are prepended to `base_path` for user search queries to form a full dn.
             """),
             examples=[["CN=TransferUsers1", "CN=TransferUsers2"]],
         ),
