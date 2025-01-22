@@ -13,7 +13,7 @@ import bottle
 
 from .import_users import import_users
 from .active_directory import CatchableADExceptions
-from .model import ResolutionList, ResolutionParser, ImportConfig, ImportResult, Resolution, EnableResolution
+from .model import ResolutionList, ResolutionParser, ImportResult, Resolution, EnableResolution, InteractiveImportConfig
 from .util import format_validation_error, random_string, KillableThread, find_free_port
 
 bottle.TEMPLATE_PATH.append(Path(__file__).parent.parent / "templates")
@@ -21,7 +21,7 @@ static_file_path = Path(__file__).parent.parent / "templates" / "static"
 
 
 def interactive_import(
-    config: ImportConfig,
+    config: InteractiveImportConfig,
     logger: Logger,
 ) -> ImportResult:
     session = InteractiveSession(config=config, logger=logger)
@@ -68,16 +68,16 @@ def interactive_import(
             return json.dumps(
                 dict(
                     # tell the browser tab to send the next heartbeat in half timeout (as milliseconds)
-                    timeout=(session.timeout / 2).total_seconds() * 1000,
+                    timeout=config.heartbeat_interval * 1000 if config.heartbeat_interval is not None else None,
                     # update the message if passwords have been exported
                     set_passwords=len(session.set_passwords),
-                    unexported_passwords=len(session.set_passwords) - session.exported_passwords,
+                    unexported_passwords=session.unexported_passwords,
                     is_active_tab=bottle.request.query.get("tab") == session.last_tab_id,
                 )
             )
 
     # start the bottle thread
-    port = find_free_port()
+    port = config.port or find_free_port()
     bottle_thread = KillableThread(
         target=bottle.run,
         kwargs=dict(
@@ -112,36 +112,49 @@ def interactive_import(
 
 
 class InteractiveSession:
-    config: ImportConfig
+    # general
+    config: InteractiveImportConfig
     logger: Logger
     tag: str
     mutex: Lock
-    timeout: timedelta
+    timeout: timedelta | None  # time after which this session detects tabs as closed
 
+    # last import_users result
+    error: str | None
+    result: ImportResult
+    set_passwords: List[Tuple[str, str]]
+
+    # runtime state
     last_request: datetime | None
     last_tab_id: str | None
     current_result_rendered: bool
     interrupted_while_unexported: bool
     exported_passwords: int
 
-    error: str | None
-    import_result: ImportResult | None
-
-    def __init__(self, config: ImportConfig, logger: Logger):
-        self.tag = random_string(6)
+    def __init__(self, config: InteractiveImportConfig, logger: Logger):
         self.config = config
         self.logger = logger
-        self.timeout = timedelta(seconds=3)
+        self.tag = random_string(6)
         self.mutex = Lock()
-        self.last_request = None
+        self.timeout = None
+        if self.config.heartbeat_interval is not None:
+            self.timeout = timedelta(seconds=self.config.heartbeat_interval * 1.5)
+
         self.error = None
         self.result = ImportResult()
         self.set_passwords = []
+        self.last_request = None
+        self.last_tab_id = None
         self.current_result_rendered = True
+        self.interrupted_while_unexported = False
         self.exported_passwords = 0
 
+    @property
+    def unexported_passwords(self) -> int:
+        return len(self.set_passwords) - self.exported_passwords
+
     def is_alive(self) -> bool:
-        if self.last_request is None:
+        if self.last_request is None or self.timeout is None:
             return True
         with self.mutex:
             return datetime.now() - self.last_request <= self.timeout
@@ -160,7 +173,7 @@ class InteractiveSession:
             bottle.abort(401)
 
     def run_import(self, new_resolution: Resolution | None = None) -> None:
-        resolutions = ResolutionList.load(file=self.config.resolutions_file, logger=self.logger)
+        resolutions = ResolutionList.load(file=self.config.resolutions_file, logger=self.logger, save_default=True)
         if new_resolution is not None:
             resolutions.append(new_resolution)
         try:
@@ -170,10 +183,11 @@ class InteractiveSession:
                 logger=self.logger.getChild("import"),
             )
             self.error = None
+            self.current_result_rendered = False
         except CatchableADExceptions as e:
             self.logger.exception("error during import_users")
-            self.import_result = None
             self.error = str(e)
+            self.current_result_rendered = False
             return
 
         # handle persistence of new_resolution
@@ -184,7 +198,7 @@ class InteractiveSession:
                     resolutions.get_rejected().save(self.config.resolutions_file)
             elif isinstance(new_resolution, EnableResolution):
                 # remember newly set password in state if it was actually set
-                enabled_user = next(filter(lambda u: u.dn == new_resolution.user, self.import_result.enabled), None)
+                enabled_user = next(filter(lambda u: u.dn == new_resolution.user, self.result.enabled), None)
                 if enabled_user is not None:
                     account_name_attributes = enabled_user.get_attribute("sAMAccountName")
                     account_name = enabled_user.dn if len(account_name_attributes) != 1 else account_name_attributes[0]
@@ -195,7 +209,7 @@ class InteractiveSession:
         self.current_result_rendered = True
         return jinja2_template(
             "resolve.html.jinja",
-            actions=self.import_result.required_interactions if self.import_result else [],
+            actions=self.result.required_interactions if self.result else [],
             password_count=len(self.set_passwords),
             tag=self.tag,
             tab_id=self.last_tab_id,

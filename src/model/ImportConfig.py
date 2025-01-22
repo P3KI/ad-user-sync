@@ -180,3 +180,27 @@ class ImportConfig(FileBaseModel):
             examples=[False],
         ),
     ]
+
+
+class InteractiveImportConfig(ImportConfig):
+    port: Annotated[
+        int | None,
+        Field(
+            default=None,
+            title="Port",
+            description="Port on which the interactive import session is listening. `null` chooses any free port.",
+            examples=[8080, None],
+            gt=0,
+        ),
+    ]
+
+    heartbeat_interval: Annotated[
+        float | None,
+        Field(
+            default=2,
+            title="Heartbeat Interval",
+            description="Interval of the heartbeat a browser tab sends in seconds. `null` deactivates tab sync.",
+            examples=[2, None],
+            le=10,
+        ),
+    ]
