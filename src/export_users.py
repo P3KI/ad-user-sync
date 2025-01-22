@@ -1,8 +1,6 @@
 from functools import partial
 from typing import Any, Dict, Callable
 
-from pyad import ADQuery
-import json
 
 from . import CachedActiveDirectory
 from .model import ExportConfig

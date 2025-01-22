@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from logging import Logger
-from typing import List, Set, Tuple, Dict, Any, Annotated
+from typing import List, Set, Tuple, Dict, Annotated
 
 from pyad import ADUser, ADGroup
 from pydantic import BaseModel, Field, field_serializer, ConfigDict

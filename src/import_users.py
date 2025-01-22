@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from logging import Logger
-from typing import Dict, List, Any, Set, Tuple
+from typing import Dict, List, Any, Set
 
 from pyad import ADGroup, ADUser, win32Exception, ADContainer
 
