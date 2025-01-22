@@ -125,7 +125,7 @@
                     class="action-form"
                     method="post"
                 >
-                    <input id="{{ action_id }}.tabId" type="hidden" name="tab_id" value="{{ tab_id }}" />
+                    <input id="{{ action_id }}.tab-id" type="hidden" name="tab_id" value="{{ tab_id }}" />
                     {# type independent action attributes #}
                     <tr>
                         <td class="action-type action-type-{{ action_id }}" colspan="2">
@@ -296,25 +296,17 @@
 
         // from here on is tab sync stuff
 
-        function showError(message) {
-            let newElement = document.createElement('div')
-            newElement.textContent = message
-            document.getElementById('original').replaceWith(newElement)
-        }
-
-        function removeElementByClassName(cls) {
-            for (const el of Array.from(document.getElementsByClassName(cls))) {
-                el.remove()
-            }
-        }
-
-
+        // current state variables
         let unexportedPasswords = 0
         let isActiveTab = true
+
+        // state dependent elements
         const stateLabel = document.getElementById('state')
         const passwordCountLabel = document.getElementById('passwords-count')
         const unexportedLabel = document.getElementById('passwords-unexported')
         const exportLink = document.getElementById('passwords-export')
+
+        // send heartbeat and receive current session state
         async function heartbeat() {
             try {
                 const response = await window.fetch('/heartbeat?tag={{ tag }}&tab={{ tab_id }}')
@@ -339,6 +331,13 @@
                 removeElementByClassName('running-only')
             }
         }
+
+        function removeElementByClassName(cls) {
+            for (const el of Array.from(document.getElementsByClassName(cls))) {
+                el.remove()
+            }
+        }
+
         heartbeat()
     </script>
 </body>
