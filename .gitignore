@@ -1,3 +1,6 @@
 .idea
 Users.json
 resolutions.json
+dist
+build
+*.spec
