@@ -2,6 +2,7 @@
 import argparse
 import json
 import logging
+import sys
 from logging import getLogger
 
 
@@ -98,4 +99,4 @@ if __name__ == "__main__":
         # else:
         print(json.dumps(users, ensure_ascii=False, indent=4))
 
-    exit(0)
+    sys.exit(0)

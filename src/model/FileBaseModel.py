@@ -1,3 +1,4 @@
+import sys
 from logging import Logger
 from pathlib import Path
 from typing import Type
@@ -27,7 +28,7 @@ class FileBaseModel(BaseModel):
                     except ValidationError as e:
                         logger.error(format_validation_error(e, source=str(file)))
                         if exit_on_fail:
-                            exit(1)
+                            sys.exit(1)
                         else:
                             raise
                 else:
@@ -36,7 +37,7 @@ class FileBaseModel(BaseModel):
                     else:
                         logger.warning(f"File {file} is empty. Can not load {cls.__name__}.")
                         if exit_on_fail:
-                            exit(1)
+                            sys.exit(1)
                         else:
                             raise FileNotFoundError()
         else:
@@ -45,7 +46,7 @@ class FileBaseModel(BaseModel):
             else:
                 logger.warning(f"File {file} does not exist. Can not load {cls.__name__}.")
                 if exit_on_fail:
-                    exit(1)
+                    sys.exit(1)
                 else:
                     raise FileNotFoundError()
 
