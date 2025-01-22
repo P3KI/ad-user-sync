@@ -7,7 +7,7 @@ from logging import getLogger
 
 
 arg_parser = argparse.ArgumentParser(
-    prog="user_sync.py",
+    prog="user_sync.exe",
     description="Import/Export Windows ActiveDirectory user accounts",
     add_help=True,
     exit_on_error=True,
@@ -18,7 +18,7 @@ import_arg_parser = subparsers.add_parser("import", help="Import Users")
 import_arg_parser.add_argument(
     "--config",
     dest="config_file",
-    default="ImportConfig.json",
+    default="import_config.json",
     help="Configuration file to use. See README.",
 )
 import_arg_parser.add_argument(
@@ -31,7 +31,7 @@ export_arg_parser = subparsers.add_parser("export", help="Export Users")
 export_arg_parser.add_argument(
     "--config",
     dest="config_file",
-    default="ExportConfig.json",
+    default="export_config.json",
     help="Configuration file to use. See README.",
 )
 

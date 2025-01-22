@@ -1,5 +1,5 @@
 {
-    "export_file" : "ExportedUsers.json",
+    "export_file" : "users.json",
     "base_path" : "CN=Users,DC=mydomain,DC=com",
     "search_groups" : ["CN=p-Managed","CN=Transfer","CN=Test"],
     "attributes":[
