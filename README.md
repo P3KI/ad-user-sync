@@ -4,8 +4,6 @@ For this to make sense two instances of this application must be operated. One o
 As the exported list of users is written to a file,
 the user must provide means to transfer this file from the exporting to the importing AD.
 
-Logs are written to `stderr` and the summary of an import is written to `stdout`.
-Feel free to pipe these outputs wherever you like. 
 
 ## Exporting
 First create a config file. Run `user_sync.exe export --help` to see what parameters are supported.
@@ -25,8 +23,11 @@ The Active Directory path specified using `managed_user_path` in the configurati
 
 Import mode creates new active directory users or updates the attributes of previously create ones to match the data found
 in the `input_file`.
+
 Managed users that have been previously created are never deleted, but deactivated if they are not part of the current `input_file`.
 
+Logs are written to `stderr` and a summary is written to `stdout`.
+Feel free to pipe these outputs wherever you like. 
 
 ### Importing Users from file 
 To import users just run:

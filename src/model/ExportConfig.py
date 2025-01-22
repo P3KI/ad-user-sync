@@ -9,10 +9,11 @@ from .FileBaseModel import FileBaseModel
 
 class ExportConfig(FileBaseModel):
     export_file: Annotated[
-        Path,
+        Path | None,
         Field(
+            default=None,
             title="Export File",
-            description="Path to the user list file for export.",
+            description="Path to the user list file for export. If not provided, the result will be printed to `stdout`.",
             examples=["users.json"],
         ),
     ]
