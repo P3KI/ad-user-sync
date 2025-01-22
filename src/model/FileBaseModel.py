@@ -9,7 +9,13 @@ from ..util import format_validation_error
 
 class FileBaseModel(BaseModel):
     @classmethod
-    def load[T](cls: Type[T], file: str, logger: Logger, exit_on_fail: bool = False) -> T:
+    def load[T](
+        cls: Type[T],
+        file: str,
+        logger: Logger,
+        exit_on_fail: bool = False,
+        save_default: bool = False,
+    ) -> T:
         file = Path(file).absolute()
         if file.is_file():
             with open(file, "r") as f:
@@ -24,10 +30,13 @@ class FileBaseModel(BaseModel):
                         else:
                             raise
                 else:
-                    logger.warning(f"File {file} is empty. Continue with default {cls.__name__}.")
+                    logger.debug(f"File {file} is empty. Continue with default {cls.__name__}.")
         else:
-            logger.warning(f"File {file} does not exist. Continue with default {cls.__name__}.")
-        return cls()
+            logger.debug(f"File {file} does not exist. Continue with default {cls.__name__}.")
+        instance = cls()
+        if save_default:
+            instance.save(file)
+        return instance
 
     def save(self, file: str) -> None:
         with open(file, "w") as out:
