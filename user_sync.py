@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import logging
 from logging import getLogger
 
@@ -86,11 +87,17 @@ if __name__ == "__main__":
 
         # write the result to stdout
         print(result.model_dump_json(indent=4))
-        exit(0)
     elif args.command == "export":
         from src import ExportConfig, export_users
 
         logger.name = "export"
         config = ExportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
 
-        export_users(config=config)
+        users = export_users(config=config)
+        if config.output_file:
+            with open(config.output_file, "w") as f:
+                json.dump(users, f, ensure_ascii=False, indent=4)
+        else:
+            print(json.dumps(users, ensure_ascii=False, indent=4))
+
+    exit(0)

@@ -64,8 +64,4 @@ def export_users(config: ExportConfig):
                 user[parser.target_key] = parser.parse(row[parser.source_key])
             users.append(user)
 
-    for user in users:
-        print(user)
-
-    with open(config.output_file, "w") as out:
-        json.dump(users, out, ensure_ascii=False, indent=4)
+    return users
