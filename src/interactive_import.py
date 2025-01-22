@@ -34,8 +34,9 @@ def interactive_import(
     def get_root():
         session.verify_tag()
         with session:
-            session.run_import()
-            return session.render_html()
+            if session.current_result_rendered:
+                session.run_import()
+            return session.render_import_result()
 
     @bottle.post("/")
     def post_root():
@@ -46,12 +47,13 @@ def interactive_import(
                 logger.info(f"new resolution via POST: {new_resolution.model_dump(exclude={'timestamp'})}")
             except ValidationError as e:
                 session.error = format_validation_error(e, source="HTTP POST Form Data")
-                return session.render_html()
+                return session.render_import_result()
             session.run_import(new_resolution=new_resolution)
-            return session.render_html()
+            return bottle.redirect(f"/?tag={session.tag}")
 
     @bottle.get("/export-passwords")
     def export_passwords():
+        session.verify_tag()
         filename = f"new-ad-passwords_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         bottle.response.headers["Content-Type"] = "text/plain"
         bottle.response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -118,7 +120,8 @@ class InteractiveSession:
 
     last_request: datetime | None
     last_tab_id: str | None
-    set_passwords: List[Tuple[str, str]]
+    current_result_rendered: bool
+    interrupted_while_unexported: bool
     exported_passwords: int
 
     error: str | None
@@ -132,8 +135,9 @@ class InteractiveSession:
         self.mutex = Lock()
         self.last_request = None
         self.error = None
-        self.import_result = None
+        self.result = ImportResult()
         self.set_passwords = []
+        self.current_result_rendered = True
         self.exported_passwords = 0
 
     def is_alive(self) -> bool:
@@ -186,8 +190,9 @@ class InteractiveSession:
                     account_name = enabled_user.dn if len(account_name_attributes) != 1 else account_name_attributes[0]
                     self.set_passwords.append((account_name, new_resolution.password))
 
-    def render_html(self) -> str:
+    def render_import_result(self) -> str:
         self.last_tab_id = random_string(6)
+        self.current_result_rendered = True
         return jinja2_template(
             "resolve.html.jinja",
             actions=self.import_result.required_interactions if self.import_result else [],
