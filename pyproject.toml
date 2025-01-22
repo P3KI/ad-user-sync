@@ -8,7 +8,7 @@ package-mode = false
 
 
 [tool.poetry.dependencies]
-python = ">=3.12"
+python = ">=3.13,<3.14"
 pywin32 = {version = "^308", markers = "sys_platform == 'win32'"}
 python-win-ad = {version = "^0.6.3", markers = "sys_platform == 'win32'"}
 pydantic = "^2.10.4"
