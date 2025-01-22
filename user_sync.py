@@ -55,24 +55,42 @@ if __name__ == "__main__":
     logger.addHandler(console_handler)
 
     if args.command == "import":
-        from src import ImportConfig
-
-        config = ImportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
-
         if args.interactive:
-            from src import interactive_import
+            from src import interactive_import, InteractiveImportConfig
 
-            result = interactive_import(config=config, logger=logger)
+            logger.name = "interactive"
+            result = interactive_import(
+                config=InteractiveImportConfig.load(
+                    file=args.config_file,
+                    logger=logger,
+                    exit_on_fail=True,
+                ),
+                logger=logger,
+            )
+
         else:
-            from src import import_users
+            from src import import_users, ImportConfig, ResolutionList
 
-            result = import_users(config=config, logger=logger)
+            logger.name = "import"
+            config = ImportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
+            result = import_users(
+                config=config,
+                logger=logger,
+                resolutions=ResolutionList.load(
+                    file=config.resolutions_file,
+                    logger=logger,
+                    save_default=True,
+                    exit_on_fail=True,
+                ),
+            )
 
-        # log the remaining unresolved actions
-        result.log_required_interactions(logger=logger)
+        # write the result to stdout
+        print(result.model_dump_json(indent=4))
+        exit(0)
     elif args.command == "export":
         from src import ExportConfig, export_users
 
+        logger.name = "export"
         config = ExportConfig.load(args.config_file, logger=logger, exit_on_fail=True)
 
         export_users(config=config)
