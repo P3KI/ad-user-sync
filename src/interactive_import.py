@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 import time
 import webbrowser
 from datetime import datetime, timedelta
@@ -16,8 +18,15 @@ from .active_directory import CatchableADExceptions
 from .model import ResolutionList, ResolutionParser, ImportResult, Resolution, EnableResolution, InteractiveImportConfig
 from .util import format_validation_error, random_string, KillableThread, find_free_port
 
-bottle.TEMPLATE_PATH.append(Path("templates"))
-static_file_path = Path("templates/static")
+
+def resource_path(relative_path) -> Path:
+    if hasattr(sys, '_MEIPASS'):
+        return Path(str(os.path.join(sys._MEIPASS, relative_path)))
+    return Path(os.path.join(os.path.abspath("."), relative_path))
+
+
+bottle.TEMPLATE_PATH.append(resource_path("templates"))
+static_file_path = resource_path("templates/static")
 
 
 def interactive_import(
