@@ -274,15 +274,15 @@ def create_user(
                 )
 
             previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
-
-        result.require_interaction(
-            NameAction(
-                user=cn,
-                attributes=user_attributes,
-                name=account_name,
-                input_name=new_account_name,
-                conflict_user=conflict_user.cn,
-                error=previous_error,
+        if name_resolution is None or name_resolution.is_accepted:
+            result.require_interaction(
+                NameAction(
+                    user=cn,
+                    attributes=user_attributes,
+                    name=account_name,
+                    input_name=new_account_name,
+                    conflict_user=conflict_user.cn,
+                    error=previous_error,
+                )
             )
-        )
         return None
