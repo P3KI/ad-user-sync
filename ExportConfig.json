@@ -1,15 +1,16 @@
 {
-    "BasePath" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
-    "SearchSubPaths" : [""],
-    "SearchGroups" : ["CN=Transfer","CN=Test"],
-    "Attributes":[
-              "displayName",
-              "givenName",
-              "sn",
-              "mail",
-              "c",
-              "l",
-              "company",
-              "department"
-    ]
+    "export_file" : "ExportedUsers.json",
+    "base_path" : "CN=Users,DC=mydomain,DC=com",
+    "search_groups" : ["CN=p-Managed","CN=Transfer","CN=Test"],
+    "attributes":[
+        "displayName",
+        "givenName",
+        "sn",
+        "mail",
+        "c",
+        "l",
+        "company",
+        "department"
+    ],
+    "search_sub_paths": null
 }

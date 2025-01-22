@@ -72,22 +72,22 @@ class ExportConfig(FileBaseModel):
                 These are `sAMAccountName`, `cn`, `disabled`, `accountExpires`, `memberOf`.
                 Additional attributes should be specified to transfer more information of the users between domains.
             """),
-            examples=[["CN=TransferUsers1", "CN=TransferUsers2"]],
+            examples=[["displayName", "givenName", "sn", "mail", "c", "l", "company", "department"]],
         ),
     ]
 
     search_sub_paths: Annotated[
-        List[str],
+        List[str] | None,
         Field(
+            default=None,
             title="Search Sub-Paths",
             description=dedent("""
                 Optional.
 
-                Specifies which attributes of user objects are written to the output file.
-                Some attributes are always exported because they are needed for the import script to work. 
-                These are `sAMAccountName`, `cn`, `disabled`, `accountExpires`, `memberOf`.
-                Additional attributes should be specified to transfer more information of the users between domains.
+                Specifies relative paths to search for user objects in the AD. 
+                Use in case not all of `BasePath` should be searched recursively. 
+                This sub paths are prepended to `BasePath` for user search queries to form a full dn.
             """),
-            examples=[["displayName", "givenName", "sn", "mail", "c", "l", "company", "department"]],
+            examples=[["CN=TransferUsers1", "CN=TransferUsers2"]],
         ),
     ]
