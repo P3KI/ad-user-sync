@@ -92,23 +92,45 @@ def interactive_import(
     webbrowser.open(url)
 
     # watch out for terminating events in the main thread
-    try:
-        while 1:
-            if not bottle_thread.is_alive():
-                # the server thread should not end by itself. this is just for good measure
-                logger.warning("bottle server was stopped somehow")
-                break
-            if not session.is_alive():  # state.is_alive() blocks while there are other requests pending
-                logger.debug("all browser tabs closed")
+    def watch_terminating_events():
+        try:
+            tabs_closed_while_unexported = False  # used to only show console warning once
+            while 1:
+                if not bottle_thread.is_alive():
+                    # the server thread should not end by itself. this is just for good measure
+                    logger.warning("bottle server was stopped somehow")
+                    break
+                if not session.is_alive():  # state.is_alive() blocks while there are other requests pending
+                    if session.unexported_passwords > 0:
+                        if not tabs_closed_while_unexported:
+                            logger.warning(
+                                f"all browser tabs closed, but there are unexported passwords "
+                                f"(open {url} to export passwords)"
+                            )
+                            tabs_closed_while_unexported = True
+                    else:
+                        logger.debug("all browser tabs closed")
+                        bottle_thread.terminate()
+                        break
+                else:
+                    tabs_closed_while_unexported = False
+                    if session.unexported_passwords == 0:
+                        session.interrupted_while_unexported = False
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            logger.debug("received keyboard interrupt")
+            if len(session.set_passwords) > 0 and not session.interrupted_while_unexported:
+                logger.warning(f"Are you sure? There are unexported passwords (interrupt again to exit)")
+                session.interrupted_while_unexported = True
+                watch_terminating_events()
+            else:
                 bottle_thread.terminate()
-                break
-            time.sleep(500)
-    except KeyboardInterrupt:
-        logger.debug("received keyboard interrupt")
-        bottle_thread.terminate()
 
-    logger.info("interactive import ended")
-    return session.import_result
+    watch_terminating_events()
+
+    bottle_thread.join()
+    logger.info("session ended")
+    return session.result
 
 
 class InteractiveSession:
