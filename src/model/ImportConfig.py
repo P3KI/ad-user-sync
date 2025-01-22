@@ -1,4 +1,5 @@
 from datetime import timedelta
+from enum import StrEnum
 from pathlib import Path
 from textwrap import dedent
 from typing import Annotated, Dict, List
@@ -6,6 +7,15 @@ from typing import Annotated, Dict, List
 from pydantic import Field
 
 from .FileBaseModel import FileBaseModel
+
+
+class LogLevel(StrEnum):
+    CRITICAL = 'CRITICAL'
+    FATAL = 'FATAL'
+    ERROR = 'ERROR'
+    WARNING = 'WARNING'
+    INFO = 'INFO'
+    DEBUG = 'DEBUG'
 
 
 class ImportConfig(FileBaseModel):
@@ -133,6 +143,18 @@ class ImportConfig(FileBaseModel):
                 If set, the content of the input file will be written to the log every time it is evaluated. 
             """),
             examples=[False],
+        ),
+    ]
+
+    log_level: Annotated[
+        LogLevel,
+        Field(
+            default=LogLevel.DEBUG,
+            title="Log Level",
+            description=dedent("""                
+                Sets the Log Level. 
+            """),
+            examples=["INFO"],
         ),
     ]
 

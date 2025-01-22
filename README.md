@@ -26,8 +26,6 @@ in the `input_file`.
 
 Managed users that have been previously created are never deleted, but deactivated if they are not part of the current `input_file`.
 
-Logs are written to `stderr` and a summary is written to `stdout`.
-Feel free to pipe these outputs wherever you like. 
 
 ### Importing Users from file 
 To import users just run:
@@ -55,6 +53,17 @@ A Browser window should open up and guide you through accepting or rejecting the
 Accepted actions are performed instantly, rejected actions are persisted to `resolutions_file` 
 so they don't pop up every time. 
 
+### Logging
+Logs are written to `stderr` and a summary is written to `stdout`.
+Feel free to pipe these outputs wherever you like. 
+
+- Misconfigurations are written on `ERROR`
+- Mishandled interactive session usage is written on `WARNING` 
+- Missing and empty file messages are written on `WARNING` 
+- All actions made to AD are written on `INFO`
+- Quite some more stuff is written to `DEBUG`
+
+The used level can be set through the `log_level` config parameter.
 
 ## Development
 Make sure you got [python >=3.13](https://www.python.org/downloads/) and [poetry](https://python-poetry.org/docs/)

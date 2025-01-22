@@ -66,21 +66,25 @@ if __name__ == "__main__":
     logger.addHandler(console_handler)
 
     if args.command == "import":
+
         if args.interactive:
             logger.name = "interactive"
+            config = InteractiveImportConfig.load(
+                file=args.config_file,
+                logger=logger,
+                fallback_default=False,
+                exit_on_fail=True
+            )
+            logger.setLevel(logging.getLevelNamesMapping()[config.log_level])
             result = interactive_import(
-                config=InteractiveImportConfig.load(
-                    file=args.config_file,
-                    logger=logger,
-                    fallback_default=False,
-                    exit_on_fail=True,
-                ),
+                config=config,
                 logger=logger,
             )
 
         else:
             logger.name = "import"
             config = ImportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
+            logger.setLevel(logging.getLevelNamesMapping()[config.log_level])
             result = import_users(
                 config=config,
                 logger=logger,

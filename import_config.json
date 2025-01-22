@@ -12,5 +12,6 @@
     "prefix_account_names": "p-",
     "default_expiration": "P1M2D",
     "rejected_actions": "rejections.json",
+    "log_level": "DEBUG",
     "heartbeat_interval": 2
 }
