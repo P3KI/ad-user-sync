@@ -218,10 +218,15 @@ def create_user(
 
     # create a new user
     try:
+        attrs : Dict[str, Any] = user_attributes | {"sAMAccountName": new_account_name}
+        if not "userPrincipalName" in attrs:
+            # Work around incorrect default UPN set by pyad, by always setting it explicitly.
+            attrs["userPrincipalName"] = f"{new_account_name}@{user_container.get_domain().get_default_upn()}"
+
         user = user_container.create_user(
             name=cn,
             enable=False,
-            optional_attributes=user_attributes | {"sAMAccountName": new_account_name},
+            optional_attributes=attrs,
         )
         result.add_created(user)
         if account_name == new_account_name:
