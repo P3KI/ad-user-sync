@@ -9,7 +9,7 @@
         "*"                   : "CN=p-Managed"
     },
     "restricted_groups": ["CN=p-Administrators"],
-    "prefix_account_names": "p-",
+    "prefix_common_names": "P3KI ",
     "default_expiration": "P1M2D",
     "rejected_actions": "rejections.json",
     "log_level": "DEBUG",

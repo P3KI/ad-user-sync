@@ -94,15 +94,15 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
-    prefix_account_names: Annotated[
+    prefix_common_names: Annotated[
         str,
         Field(
             default="",
-            title="Prefix Account Names",
+            title="Prefix Common Names",
             description=dedent("""                
-                A prefix that is added all managed user and common names to avoid conflicts with existing non-managed users.
+                A prefix that is added all managed common names to avoid conflicts with existing non-managed users.
             """),
-            examples=["p-"],
+            examples=["P3KI "],
         ),
     ]
 
