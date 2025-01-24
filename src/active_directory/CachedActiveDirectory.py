@@ -6,12 +6,12 @@ from pyad import ADContainer, ADGroup, ADQuery, ADUser
 
 class CachedActiveDirectory:
     @lru_cache(maxsize=None)
-    def find_single_user(self, domain: ADContainer, where: str) -> ADUser | None:
+    def find_single_user(self, domain: ADContainer | None, where: str) -> ADUser | None:
         query = ADQuery()
         query.execute_query(
             attributes=["distinguishedName"],
             where_clause=f"objectClass = 'user' AND {where}",
-            base_dn=domain.dn,
+            base_dn=domain.dn if domain else None,
         )
         if len(query) == 0:
             return None

@@ -232,57 +232,60 @@ def create_user(
         return user
 
     except win32Exception as e:
-        # creation failed. check if it was because of a name conflict
-        if e.error_info.get("error_code") != "0x80071392":
-            # it was another problem. re-raise exception
-            raise
+        # creation failed. check if it was because of a cn conflict
+        conflict_user = active_directory.find_single_user(None, f"cn = '{cn}'")
+        if conflict_user is not None:
+            logger.error(f"Unmanaged user with same cn exists: {cn}")
+            return None
 
+        # creation failed. check if it was because of a name conflict
         conflict_user = active_directory.find_single_user(
-            domain=user_container.get_domain(),
+            domain=None, # user_container.get_domain(),
             where=f"sAMAccountName = '{new_account_name}'",
         )
-        if conflict_user is None:
+        if conflict_user is not None:
+            # name conflict detected -> add required action
+            # the action should refer to the account_name from the import file, not a previous renaming
+            previous_error = None
+            if account_name != new_account_name:
+                conflict_user = active_directory.find_single_user(
+                    domain=user_container.get_domain(),
+                    where=f"sAMAccountName = '{account_name}'",
+                )
+
+                # edge case:
+                if conflict_user is None:
+                    # seems that the original account name is available in the meantime
+                    logger.debug(
+                        f"Account renaming applied for {cn} ({account_name} -> {new_account_name}) "
+                        f"which gave another name conflict. But the original account name seems to be "
+                        f"available in the meantime."
+                    )
+                    return create_user(
+                        cn=cn,
+                        account_name=account_name,
+                        user_attributes=user_attributes,
+                        name_resolution=None,
+                        active_directory=active_directory,
+                        user_container=user_container,
+                        logger=logger,
+                        result=result,
+                    )
+
+                previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
+
+                if name_resolution is None or name_resolution.is_accepted:
+                    result.require_interaction(
+                        NameAction(
+                            user=cn,
+                            attributes=user_attributes,
+                            name=account_name,
+                            input_name=new_account_name,
+                            conflict_user=conflict_user.cn,
+                            error=previous_error,
+                        )
+                    )
+                return None
+
             # it was another problem. re-raise exception
             raise
-
-        # name conflict detected -> add required action
-        # the action should refer to the account_name from the import file, not a previous renaming
-        previous_error = None
-        if account_name != new_account_name:
-            conflict_user = active_directory.find_single_user(
-                domain=user_container.get_domain(),
-                where=f"sAMAccountName = '{account_name}'",
-            )
-
-            # edge case:
-            if conflict_user is None:
-                # seems that the original account name is available in the meantime
-                logger.debug(
-                    f"Account renaming applied for {cn} ({account_name} -> {new_account_name}) "
-                    f"which gave another name conflict. But the original account name seems to be "
-                    f"available in the meantime."
-                )
-                return create_user(
-                    cn=cn,
-                    account_name=account_name,
-                    user_attributes=user_attributes,
-                    name_resolution=None,
-                    active_directory=active_directory,
-                    user_container=user_container,
-                    logger=logger,
-                    result=result,
-                )
-
-            previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
-        if name_resolution is None or name_resolution.is_accepted:
-            result.require_interaction(
-                NameAction(
-                    user=cn,
-                    attributes=user_attributes,
-                    name=account_name,
-                    input_name=new_account_name,
-                    conflict_user=conflict_user.cn,
-                    error=previous_error,
-                )
-            )
-        return None
