@@ -97,12 +97,13 @@ class ImportConfig(FileBaseModel):
     prefix_common_names: Annotated[
         str,
         Field(
-            default="",
+            default="P3KI ",
             title="Prefix Common Names",
             description=dedent("""                
                 A prefix that is added all managed common names to avoid conflicts with existing non-managed users.
             """),
             examples=["P3KI "],
+            min_length=2,
         ),
     ]
 
