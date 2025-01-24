@@ -103,7 +103,7 @@ if __name__ == "__main__":
         config = ExportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
 
         users = export_users(config=config)
-        if config.output_file:
+        if config.export_file:
             with open(config.export_file, "w") as f:
                 json.dump(users, f, ensure_ascii=False, indent=4)
         else:
