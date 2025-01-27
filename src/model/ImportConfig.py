@@ -107,15 +107,14 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
-    default_expiration: Annotated[
+    expiration_time: Annotated[
         timedelta,
         Field(
             default="P1M1D",
-            title="Default Expiration",
+            title="Expiration Time",
             description=dedent("""                
                 Specifies how long managed user accounts should be valid for.
                 The expiration date is extended by the specified time every time the import script is done.
-                If the source account expiration date is closer than the specified time, the source value is used instead.
                   format:  ISO_8601 - https://en.wikipedia.org/wiki/ISO_8601#Durations
             """),
             examples=["P1M1D"],

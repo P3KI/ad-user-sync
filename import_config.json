@@ -10,7 +10,7 @@
     },
     "restricted_groups": ["CN=p-Administrators"],
     "prefix_common_names": "P3KI ",
-    "default_expiration": "P1M2D",
+    "expiration_time": "P1M2D",
     "rejected_actions": "rejections.json",
     "log_level": "DEBUG",
     "heartbeat_interval": 2

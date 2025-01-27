@@ -85,13 +85,7 @@ def import_users(
         current_users.add(user)
 
         # Set expiration
-        expiration_date = datetime.now() + config.default_expiration  # has to be at least the default_expiration
-        if account_expires:
-            # if `accountExpires` from the input file is longer, apply that instead
-            account_expires_date = datetime.fromisoformat(account_expires)
-            if account_expires_date > expiration_date:
-                expiration_date = account_expires_date
-        user.set_expiration(expiration_date)
+        user.set_expiration(datetime.now() + config.expiration_time)
 
         # Enable/Disable the User
         existing_user_is_disabled = user._ldap_adsi_obj.AccountDisabled
