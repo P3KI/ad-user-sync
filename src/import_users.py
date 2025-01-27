@@ -41,7 +41,6 @@ def import_users(
     user_container = active_directory.get_container(full_path(config.base_path, config.managed_user_path))
 
     # All users imported during this run
-    old_users: Set[ADUser] = set(user_container.get_children(recursive=False, filter=[ADUser]))
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list
 
     # User memberships for all managed groups are collected here
