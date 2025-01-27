@@ -141,7 +141,7 @@ def import_users(
 
     # Update memberships of managed groups
     for group, current_group_members in current_members_by_group.items():
-        old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
+        old_members: Set[ADUser] = set(group.get_members(ignore_groups=True)).intersection(current_users)
 
         removed_members = old_members - current_group_members
 
@@ -187,13 +187,6 @@ def import_users(
                 for user in new_members:
                     logger.info(f'{user.cn}: Joined restricted group "{group.cn}" (accepted manually)')
                     result.add_joined(user, group)
-
-    # Disable users currently in AD but not in current import list
-    removed_users = old_users - current_users
-    for user in removed_users:
-        user.disable()
-        logger.info(f"{user.cn}: Was disabled (user no longer in import list)")
-        result.add_disabled(user)
 
     return result
 
