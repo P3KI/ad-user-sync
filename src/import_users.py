@@ -141,10 +141,10 @@ def import_users(
 
     # Update memberships of managed groups
     for group, current_group_members in current_members_by_group.items():
-        old_members: Set[ADUser] = set(group.get_members(ignore_groups=True)).intersection(current_users)
+        old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
 
-        removed_members = old_members - current_group_members
-
+        # remove users from group if the user is still in the import file, but no longer has the group membership
+        removed_members = (old_members - current_group_members) & current_users
         if len(removed_members) > 0:
             group.remove_members(removed_members)
             for user in removed_members:
