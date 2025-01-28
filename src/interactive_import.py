@@ -249,6 +249,7 @@ class InteractiveSession:
             "resolve.html.jinja",
             actions=self.result.required_interactions if self.result else [],
             password_count=len(self.set_passwords),
+            password_word_count=self.config.password_word_count,
             tag=self.tag,
             tab_id=self.last_tab_id,
             error=self.error,

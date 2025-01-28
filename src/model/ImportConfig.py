@@ -192,3 +192,13 @@ class InteractiveImportConfig(ImportConfig):
             examples=[True, False],
         ),
     ]
+
+    password_word_count: Annotated[
+        int,
+        Field(
+            default=3,
+            title="Password Word Count",
+            description="Number of words sampled from the password list to generate a password.",
+            examples=[3],
+        ),
+    ]
