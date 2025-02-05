@@ -55,6 +55,6 @@ class FileBaseModel(BaseModel):
             instance.save(file)
         return instance
 
-    def save(self, file: str) -> None:
+    def save(self, file: str | Path) -> None:
         with open(file, "w") as out:
             out.write(self.model_dump_json(indent=4))

@@ -1,5 +1,6 @@
 import json
 import os
+import signal
 import sys
 import time
 import webbrowser
@@ -10,7 +11,7 @@ from threading import Lock
 from typing import List, Tuple
 
 from pydantic import ValidationError
-from bottle import jinja2_template
+from bottle import jinja2_template, cached_property
 import bottle
 
 from .import_users import import_users
@@ -85,66 +86,7 @@ def interactive_import(
                 )
             )
 
-    # start the bottle thread
-    port = config.port or find_free_port()
-    bottle_thread = KillableThread(
-        target=bottle.run,
-        kwargs=dict(
-            host="localhost",
-            port=port,
-            quiet=True,
-        ),
-    )
-    bottle_thread.start()
-    url = f"http://localhost:{port}?tag={session.tag}"
-    logger.info(f"session started: {url}")
-    webbrowser.open(url)
-
-    # watch out for terminating events in the main thread
-    def watch_terminating_events():
-        try:
-            tabs_closed_message_logged = False
-            while 1:
-                if not bottle_thread.is_alive():
-                    # the server thread should not end by itself. this is just for good measure
-                    logger.warning("bottle server was stopped somehow")
-                    break
-                if not session.is_alive():  # state.is_alive() blocks while there are other requests pending
-                    if not tabs_closed_message_logged:
-                        logger.debug("all browser tabs closed")
-
-                    if config.terminate_on_tab_close:
-                        if session.unexported_passwords == 0:
-                            bottle_thread.terminate()
-                            return
-                        elif not tabs_closed_message_logged:
-                            logger.warning(
-                                f"all browser tabs closed, but there are unexported passwords "
-                                f"(open {url} to export passwords)"
-                            )
-                    tabs_closed_message_logged = True
-                else:
-                    tabs_closed_message_logged = False
-                    if session.unexported_passwords == 0:
-                        session.interrupted_while_unexported = False
-                time.sleep(0.5)
-        except KeyboardInterrupt:
-            logger.debug("received keyboard interrupt")
-            if session.unexported_passwords > 0 and not session.interrupted_while_unexported:
-                logger.warning(
-                    f"Are you sure? There are unexported passwords "
-                    f"(interrupt again to exit or open {url} to export passwords)"
-                )
-                session.interrupted_while_unexported = True
-                watch_terminating_events()
-            else:
-                bottle_thread.terminate()
-
-    watch_terminating_events()
-
-    bottle_thread.join(timeout=5)
-    logger.info("session ended")
-    return session.result
+    return session.start()
 
 
 class InteractiveSession:
@@ -164,8 +106,8 @@ class InteractiveSession:
     last_request: datetime | None
     last_tab_id: str | None
     current_result_rendered: bool
-    interrupted_while_unexported: bool
     exported_passwords: int
+    port: int
 
     def __init__(self, config: InteractiveImportConfig, logger: Logger):
         self.config = config
@@ -182,18 +124,21 @@ class InteractiveSession:
         self.last_request = None
         self.last_tab_id = None
         self.current_result_rendered = True
-        self.interrupted_while_unexported = False
         self.exported_passwords = 0
+        self.port = find_free_port() if self.config.port is None else self.config.port
+
 
     @property
     def unexported_passwords(self) -> int:
         return len(self.set_passwords) - self.exported_passwords
 
-    def is_alive(self) -> bool:
-        if self.last_request is None or self.timeout is None:
-            return True
-        with self.mutex:
-            return datetime.now() - self.last_request <= self.timeout
+    @property
+    def has_unexported_passwords(self) -> bool:
+        return self.unexported_passwords > 0
+
+    @property
+    def url(self) -> str:
+        return f"http://localhost:{self.port}?tag={self.tag}"
 
     def __enter__(self):
         res = self.mutex.__enter__()
@@ -203,6 +148,12 @@ class InteractiveSession:
     def __exit__(self, exc_type, exc_value, traceback):
         self.last_request = datetime.now()
         self.mutex.__exit__(exc_type, exc_value, traceback)
+
+    def has_open_browser_tabs(self) -> bool:
+        if self.last_request is None or self.timeout is None:
+            return True
+        with self.mutex:
+            return datetime.now() - self.last_request <= self.timeout
 
     def verify_tag(self):
         if bottle.request.query.get("tag") != self.tag:
@@ -254,3 +205,71 @@ class InteractiveSession:
             tab_id=self.last_tab_id,
             error=self.error,
         )
+
+    def start(self) -> ImportResult:
+        # start the bottle thread
+        bottle_thread = KillableThread(
+            target=bottle.run,
+            kwargs=dict(
+                host="localhost",
+                port=self.port,
+                quiet=True,
+            ),
+        )
+        bottle_thread.start()
+
+        self.logger.warning(f"session started: {self.url}")
+        webbrowser.open(self.url)
+
+        # watch out for terminating events in the main thread
+        self._wait_for_terminating_events(bottle_thread)
+        bottle_thread.terminate()
+        bottle_thread.join(timeout=5)
+        self.logger.warning("session ended")
+        return self.result
+
+    def _wait_for_terminating_events(
+        self,
+        bottle_thread: KillableThread,
+        terminated_once_while_unexported: bool = False,
+        tabs_closed_detected: bool = False,
+    ) -> None:
+        try:
+            while 1:
+                if not bottle_thread.is_alive():
+                    # the server thread should not end by itself. this is just for good measure
+                    self.logger.error("bottle server was stopped somehow")
+                    return
+
+                if self.has_open_browser_tabs():  # has_open_browser_tabs() blocks while there are pending requests
+                    tabs_closed_detected = False
+                else:
+                    if not tabs_closed_detected:
+                        self.logger.debug("all browser tabs were closed")
+
+                    if self.config.terminate_on_browser_close:
+                        if not self.has_unexported_passwords:
+                            return
+                        elif not tabs_closed_detected:
+                            self.logger.warning(
+                                f"All browser tabs were closed, but there are unexported passwords.\n"
+                                f"Open {self.url} to export passwords or ctrl-c to exit."
+                            )
+                            terminated_once_while_unexported = True
+                    tabs_closed_detected = True
+
+                if not self.has_unexported_passwords:
+                    terminated_once_while_unexported = False
+                time.sleep(0.5)
+        except KeyboardInterrupt:
+            self.logger.debug("received keyboard interrupt")
+            if self.has_unexported_passwords and not terminated_once_while_unexported:
+                self.logger.warning(
+                    f"Are you sure you want to exit? There are unexported passwords.\n"
+                    f"Open {self.url} to export passwords or ctrl-c again to terminate."
+                )
+                self._wait_for_terminating_events(
+                    bottle_thread=bottle_thread,
+                    terminated_once_while_unexported=True,
+                    tabs_closed_detected=tabs_closed_detected,
+                )
