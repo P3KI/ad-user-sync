@@ -133,6 +133,9 @@
                     <tr>
                         <td class="action-type action-type-{{ action_id }}" colspan="2">
                             {{ type_descriptions[action.type] }}
+                            {% if action.type == 'disable' and action.deleted %}
+                                (deleted from import)
+                            {% endif %}
                             <input id="{{ action_id }}.type" type="hidden" name="type" value="{{ action.type }}" />
                         </td>
                     </tr>

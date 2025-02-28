@@ -19,6 +19,7 @@ class EnableAction(Action):
 
 class DisableAction(Action):
     type: Literal["disable"] = "disable"
+    deleted: bool
 
 class JoinAction(Action):
     type: Literal["join"] = "join"

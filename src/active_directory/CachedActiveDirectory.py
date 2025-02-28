@@ -20,6 +20,11 @@ class CachedActiveDirectory:
         return ADUser.from_dn(dn)
 
     @lru_cache(maxsize=None)
+    def find_users(self, parent: ADContainer):
+        return set(parent.get_children_iter(recursive=True, filter= [ADUser]))
+
+
+    @lru_cache(maxsize=None)
     def find_users_attributes(
         self,
         attributes: Tuple[str],

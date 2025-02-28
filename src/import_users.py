@@ -65,20 +65,8 @@ def import_users(
             if user is None:
                 # User does not exist locally (manually deleted or never created), just ignore it.
                 continue
-
-            # Don't disable user automatically, use interaction.
-            if not is_disabled(user):
-                disable_resolution = resolutions.get_disable(user.cn)
-                if disable_resolution is None:
-                    # No resolution was found -> Add interactive action
-                    result.require_interaction(DisableAction(user=user.cn))
-                elif disable_resolution.accept is True:
-                    # Disable action was accepted -> Disable user
-                    result.add_disabled(user)
-                    user.disable()
-                    logger.info(f"{user.cn}: Was disabled (accepted manually)")
-                else:
-                    logger.info(f"{user.cn}: Disabled user is left to expire")
+            else:
+                handle_disabled_user(logger, resolutions, result, user, False)
 
         # Create user or update user attributes
         if user is None:
@@ -205,10 +193,34 @@ def import_users(
                     logger.info(f'{user.cn}: Joined restricted group "{group.cn}" (accepted manually)')
                     result.add_joined(user, group)
 
+
+    # Check of existing users that are not in the import file.
+    missing_users = active_directory.find_users(user_container) - current_users
+    for user in missing_users:
+        handle_disabled_user(logger, resolutions, result, user, True)
+
     return result
+
+
+def handle_disabled_user(logger:Logger, resolutions: ResolutionList, result: ImportResult, user: ADUser, deleted: bool):
+    # Don't disable user automatically, use interaction.
+    if not is_disabled(user):
+        disable_resolution = resolutions.get_disable(user.cn)
+        if disable_resolution is None:
+            # No resolution was found -> Add interactive action
+            result.require_interaction(DisableAction(user=user.cn, deleted=deleted))
+        elif disable_resolution.accept is True:
+            # Disable action was accepted -> Disable user
+            result.add_disabled(user)
+            user.disable()
+            logger.info(f"{user.cn}: Was disabled (accepted manually)")
+        else:
+            logger.info(f"{user.cn}: Disabled user is left to expire")
+
 
 def is_disabled(user : ADUser) -> bool:
     return user._ldap_adsi_obj.AccountDisabled
+
 
 def create_user(
     cn: str,
