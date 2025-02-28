@@ -17,9 +17,15 @@ class Action(BaseModel, ABC):
 class EnableAction(Action):
     type: Literal["enable"] = "enable"
 
+class DisableAction(Action):
+    type: Literal["disable"] = "disable"
 
 class JoinAction(Action):
     type: Literal["join"] = "join"
+    group: str
+
+class LeaveAction(Action):
+    type: Literal["join"] = "leave"
     group: str
 
 

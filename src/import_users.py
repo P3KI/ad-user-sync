@@ -7,6 +7,7 @@ from pyad import ADGroup, ADUser, win32Exception, ADContainer
 
 from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
+from .model.Action import DisableAction, LeaveAction
 from .util import not_none, full_path
 
 
@@ -52,12 +53,34 @@ def import_users(
         account_name: str = user_attributes.pop("sAMAccountName")  # used for user creation
         member_of: List[str] = user_attributes.pop("memberOf")  # will be mapped to "member" attribute of groups
         account_expires: str | None = user_attributes.pop("accountExpires", None)  # set via ADUser.set_expiration()
-        disabled: bool = user_attributes.pop("disabled", False)  # We only disable via ADUser.disable(), never enable
+        disable: bool = user_attributes.pop("disabled", False)  # We only disable via ADUser.disable(), never enable
         user_attributes.pop("subPath", None)  # Currently not used, not a valid AD attribute.
         user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
 
-        # Create user or update user attributes
+        # Retrieve existing user, if present
         user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
+
+        # Handle disabled users
+        if disable:
+            if user is None:
+                # User does not exist locally (manually deleted or never created), just ignore it.
+                continue
+
+            # Don't disable user automatically, use interaction.
+            if not is_disabled(user):
+                disable_resolution = resolutions.get_disable(user.cn)
+                if disable_resolution is None:
+                    # No resolution was found -> Add interactive action
+                    result.require_interaction(DisableAction(user=user.cn))
+                elif disable_resolution.accept is True:
+                    # Disable action was accepted -> Disable user
+                    result.add_disabled(user)
+                    user.disable()
+                    logger.info(f"{user.cn}: Was disabled (accepted manually)")
+                else:
+                    logger.info(f"{user.cn}: Disabled user is left to expire")
+
+        # Create user or update user attributes
         if user is None:
             user = create_user(
                 cn=cn,
@@ -83,44 +106,40 @@ def import_users(
         # add the user to the list of users, present in the current import list
         current_users.add(user)
 
-        # Set expiration
-        user.set_expiration(datetime.now() + config.expiration_time)
+        if not disable:
+            # Extend expiration (disabled users in the import are left to expire)
+            user.set_expiration(datetime.now() + config.expiration_time)
 
-        # Enable/Disable the User
-        existing_user_is_disabled = user._ldap_adsi_obj.AccountDisabled
-        if disabled and not existing_user_is_disabled:
-            # enabled existing user should be disabled
-            user.disable()
-            logger.info(f"{user.cn}: Was disabled (disabled attribute set in input file)")
-            result.add_disabled(user)
-        elif not disabled and existing_user_is_disabled:
-            # enabling a disabled existing user requires a resolved interactive action
-            # we do not enable automatically
-            enable_resolution = resolutions.get_enable(user.cn)
-            if enable_resolution is None:
-                # no resolved action was found -> add interactive action
-                result.require_interaction(EnableAction(user=user.cn))
-            elif enable_resolution.accept is True:
-                # resolved action was found and it got accepted
-                try:
-                    user.set_password(enable_resolution.password)
-                    user.enable()
-                    result.add_enabled(user)
-                    logger.info(f"{user.cn}: Was enabled (accepted manually)")
-                except win32Exception as e:
-                    if e.error_info.get("error_code") != "0x800708c5":
-                        raise
-                    logger.debug(f"{user.cn}: Manually provided password does not match requirements")
-                    result.require_interaction(
-                        EnableAction(
-                            user=user.cn,
-                            error=e.error_info.get("message", "Password does not meet requirements"),
+            # Enable the User
+            if is_disabled(user):
+                # enabling a disabled existing user requires a resolved interactive action
+                # we do not enable automatically
+                enable_resolution = resolutions.get_enable(user.cn)
+                if enable_resolution is None:
+                    # no resolved action was found -> add interactive action
+                    result.require_interaction(EnableAction(user=user.cn))
+                elif enable_resolution.accept is True:
+                    # resolved action was found and it got accepted
+                    try:
+                        user.set_password(enable_resolution.password)
+                        user.enable()
+                        result.add_enabled(user)
+                        logger.info(f"{user.cn}: Was enabled (accepted manually)")
+                    except win32Exception as e:
+                        if e.error_info.get("error_code") != "0x800708c5":
+                            raise
+                        logger.debug(f"{user.cn}: Manually provided password does not match requirements")
+                        result.require_interaction(
+                            EnableAction(
+                                user=user.cn,
+                                error=e.error_info.get("message", "Password does not meet requirements"),
+                            )
                         )
-                    )
 
-            else:
-                # resolved action was found and it got rejected
-                logger.debug(f"{user.cn}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
+                else:
+                    # resolved action was found and it got rejected
+                    logger.debug(f"{user.cn}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
+
 
         # Add user as a member to managed groups for later processing
         # We can't set group membership fora user directly, instead we have to set user members for groups.
@@ -139,10 +158,15 @@ def import_users(
         # remove users from group if the user is still in the import file, but no longer has the group membership
         removed_members = (old_members - current_group_members) & current_users
         if len(removed_members) > 0:
-            group.remove_members(removed_members)
+            #group.remove_members(removed_members)
             for user in removed_members:
                 logger.info(f'{user.cn}: Removed from group "{group.cn}" (membership not present in import list)')
-                result.add_left(user, group)
+                leave_resolution = resolutions.get_leave(user=user.cn, group=group.cn)
+                if leave_resolution is None:
+                    result.require_interaction(LeaveAction(user=user.cn, group=group.cn))
+                elif leave_resolution.accept is True:
+                    group.remove_members([user])
+                    result.add_left(user, group)
 
         # add members to group that haven't been members before
         if group not in restricted_groups:
@@ -183,6 +207,8 @@ def import_users(
 
     return result
 
+def is_disabled(user : ADUser) -> bool:
+    return user._ldap_adsi_obj.AccountDisabled
 
 def create_user(
     cn: str,

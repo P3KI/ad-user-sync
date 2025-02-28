@@ -18,7 +18,9 @@
 
 {% set type_descriptions = {
     'enable': 'Enable User',
+    'disable': 'Disable User',
     'join': 'Join Group',
+    'leave': 'Leave Group',
     'name': 'Account Name Conflict',
 } %}
 
@@ -144,6 +146,14 @@
 
                     {# type dependent action attributes #}
                     {% if action.type == 'join' %}
+                        <tr>
+                            <td>Group</td>
+                            <td>
+                                {{ action.group }}
+                                <input id="{{ action_id }}.group" type="hidden" name="group" value="{{ action.group }}" />
+                            </td>
+                        </tr>
+                    {% elif action.type == 'leave' %}
                         <tr>
                             <td>Group</td>
                             <td>

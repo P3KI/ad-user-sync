@@ -32,9 +32,15 @@ class EnableResolution(BaseResolution):
     type: Literal["enable"] = "enable"
     password: Annotated[str | None, Field(default="", exclude=True)]
 
+class DisableResolution(BaseResolution):
+    type: Literal["disable"] = "disable"
 
 class JoinResolution(BaseResolution):
     type: Literal["join"] = "join"
+    group: str
+
+class LeaveResolution(BaseResolution):
+    type: Literal["leave"] = "leave"
     group: str
 
 
@@ -44,7 +50,7 @@ class NameResolution(BaseResolution):
     new_name: Annotated[str | None, Field(default="", exclude=True)]
 
 
-Resolution = Annotated[EnableResolution | JoinResolution | NameResolution, Field(discriminator="type")]
+Resolution = Annotated[EnableResolution | DisableResolution | LeaveResolution | JoinResolution | NameResolution, Field(discriminator="type")]
 ResolutionParser = TypeAdapter(Resolution)
 
 R = TypeVar("R", bound=Resolution)
@@ -72,9 +78,18 @@ class ResolutionList(FileBaseModel):
         # get the latest enable resolution for this user
         return next(iter(self._filter(EnableResolution, user)), None)
 
+    def get_disable(self, user: str) -> DisableResolution | None:
+        # get the latest disable resolution for this user
+        return next(iter(self._filter(DisableResolution, user)), None)
+
     def get_join(self, user: str, group: str) -> JoinResolution | None:
         # get the last join resolution for this user and group
         resolutions = filter(lambda r: r.group == group, self._filter(JoinResolution, user))
+        return next(resolutions, None)
+
+    def get_leave(self, user: str, group: str) -> LeaveResolution | None:
+        # get the last leave resolution for this user and group
+        resolutions = filter(lambda r: r.group == group, self._filter(LeaveResolution, user))
         return next(resolutions, None)
 
     def get_name(self, user: str, name: str) -> NameResolution | None:
