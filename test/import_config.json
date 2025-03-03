@@ -1,5 +1,5 @@
 {
-    "input_file": "users.json",
+    "input_file": "In.json",
     "base_path": "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
     "managed_user_path": "CN=P3KI Managed",
     "group_map": {
@@ -11,7 +11,7 @@
     "restricted_groups": ["CN=p-Administrators"],
     "prefix_common_names": "P3KI ",
     "expiration_time": "P1M2D",
-    "resolutions_file": "rejections.json",
+    "resolutions_file": "Resolutions.json",
     "log_level": "DEBUG",
     "heartbeat_interval": 2
 }

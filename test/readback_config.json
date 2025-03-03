@@ -1,7 +1,8 @@
 {
-    "export_file" : "users.json",
+    "export_file" : "Readback.json",
     "base_path" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
-    "search_groups" : ["CN=Transfer"],
+    "search_sub_paths" : ["CN=P3KI Managed"],
+    "search_groups" : ["CN=p-Managed"],
     "attributes":[
         "displayName",
         "givenName",
@@ -11,6 +12,5 @@
         "l",
         "company",
         "department"
-    ],
-    "search_sub_paths": null
+    ]
 }

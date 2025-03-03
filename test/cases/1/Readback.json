@@ -1,0 +1,56 @@
+[
+    {
+        "company": "ACME",
+        "c": "de",
+        "sAMAccountName": "test1",
+        "cn": "P3KI Test1",
+        "givenName": "Test1",
+        "accountExpires": "2025-04-04T15:41:15",
+        "displayName": "Test1DN",
+        "mail": "test1@acme.com",
+        "l": "CityA",
+        "department": "Software Testing",
+        "disabled": false,
+        "memberOf": [
+            "CN=p-Managed",
+            "CN=p-Viewers"
+        ],
+        "sn": "Test1SN"
+    },
+    {
+        "company": "ACME",
+        "c": "nl",
+        "sAMAccountName": "test2",
+        "cn": "P3KI Test2",
+        "givenName": "Test2",
+        "accountExpires": "2025-04-04T15:41:15",
+        "displayName": "Test2DN",
+        "mail": "test2@acme.com",
+        "l": "CityB",
+        "department": null,
+        "disabled": false,
+        "memberOf": [
+            "CN=p-Managed",
+            "CN=p-Operators"
+        ],
+        "sn": "Test2SN"
+    },
+    {
+        "company": "ACME",
+        "c": "be",
+        "sAMAccountName": "test3",
+        "cn": "P3KI Test3",
+        "givenName": "Test3",
+        "accountExpires": "2025-04-04T15:41:15",
+        "displayName": "Test3DN",
+        "mail": "test3@acme.com",
+        "l": null,
+        "department": null,
+        "disabled": false,
+        "memberOf": [
+            "CN=p-Managed",
+            "CN=p-Administrators"
+        ],
+        "sn": "Test3SN"
+    }
+]
