@@ -118,14 +118,18 @@ def cleanup(config):
 count = 0
 failures = 0
 
-tests = list(testPath.glob("*"))
-tests.sort()
+if len(sys.argv) == 1:
+    tests = list(testPath.glob("*"))
+    tests.sort()
+
+else:
+    print( sys.argv[1:])
+    tests = map(lambda s : pathlib.Path(s).absolute(), sys.argv[1:])
 
 for test in tests:
     count += 1
     if not run_test(test):
         failures += 1
-
 
 if failures > 0:
     print("Test Results: Failed {} of {} tests".format(failures, count))
