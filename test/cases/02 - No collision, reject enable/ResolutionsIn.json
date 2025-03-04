@@ -1,0 +1,33 @@
+{
+    "resolutions": [
+        {
+            "type": "join",
+            "user": "P3KI Test3",
+            "accept": true,
+            "timestamp": "2025-03-03T12:45:14.447150Z",
+            "group": "p-Administrators"
+        },
+        {
+            "type": "enable",
+            "user": "P3KI Test1",
+            "accept": true,
+            "password": "foobar1234_",
+            "timestamp": "2025-03-03T12:48:15.960583Z"
+        },
+        {
+            "type": "enable",
+            "user": "P3KI Test2",
+            "accept": true,
+            "password": "foobar1234_",
+            "timestamp": "2025-03-03T12:48:15.960583Z"
+        },
+        {
+            "type": "enable",
+            "user": "P3KI Test3",
+            "accept": false,
+            "password": "foobar1234_",
+            "timestamp": "2025-03-03T12:48:15.960583Z"
+        }
+
+    ]
+}
