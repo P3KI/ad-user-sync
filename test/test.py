@@ -93,10 +93,10 @@ def compare_users(expected, actual, expected_expiry):
         if key == "accountExpires":
             delta = abs((dateutil.parser.parse(actual[key]) - expected_expiry).total_seconds())
             if delta > 600:
-                raise AssertionError("User property for '{}' differs: Expected: '{}' Actual: '{}'".format(key, expected[key], actual[key]))
+                raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}'".format(actual["cn"], key, expected[key], actual[key]))
         else:
             if expected[key] != actual[key]:
-                raise AssertionError("User property for '{}' differs: Expected: '{}' Actual: '{}'".format(key, expected[key], actual[key]))
+                raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}'".format(actual["cn"], key, expected[key], actual[key]))
 
 
 def sort_lists(l):
@@ -128,8 +128,8 @@ for test in tests:
 
 
 if failures > 0:
-    print("Failed {} of {} tests".format(failures, count))
+    print("Test Results: Failed {} of {} tests".format(failures, count))
     exit(1)
 else:
-    print("All {} tests passed!".format(count))
+    print("Test Results: All {} tests passed!".format(count))
     exit(0)
