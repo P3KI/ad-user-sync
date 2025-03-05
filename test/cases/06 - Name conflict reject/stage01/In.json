@@ -1,0 +1,38 @@
+[
+    {
+        "givenName": "Test1",
+        "company": "ACME",
+        "sAMAccountName": "test1",
+        "cn": "Test1",
+        "displayName": "Test1DN",
+        "l": "CityA",
+        "memberOf": [
+            "CN=t-Viewers",
+            "CN=Transfer"
+        ],
+        "mail": "test1@acme.com",
+        "disabled": false,
+        "accountExpires": null,
+        "sn": "Test1SN",
+        "c": "de",
+        "department": "Software Testing"
+    },
+    {
+        "givenName": "Test2",
+        "company": "ACME",
+        "sAMAccountName": "test2",
+        "cn": "Test2",
+        "displayName": "Test2DN",
+        "l": "CityB",
+        "memberOf": [
+            "CN=t-Operators",
+            "CN=Transfer"
+        ],
+        "mail": "test2@acme.com",
+        "disabled": false,
+        "accountExpires": "2025-02-01T00:00:00",
+        "sn": "Test2SN",
+        "c": "nl",
+        "department": null
+    }
+]

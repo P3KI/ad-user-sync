@@ -1,0 +1,18 @@
+{
+    "resolutions": [
+        {
+            "type": "enable",
+            "user": "P3KI Test3",
+            "accept": true,
+            "password": "foobar1234_",
+            "timestamp": "2025-03-03T12:48:15.960583Z"
+        },
+        {
+            "type": "name",
+            "user": "P3KI Test3",
+            "accept": false,
+            "name": "test2",
+            "timestamp": "2025-03-03T12:48:15.960583Z"
+        }
+    ]
+}
