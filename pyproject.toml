@@ -20,6 +20,8 @@ bottle = "^0.13.2"
 ruff = "^0.8.6"
 pyinstaller = "^6.11.1"
 
+[tool.poetry.group.test.dependencies]
+pytest = "^25.0.1"
 
 [build-system]
 requires = ["poetry-core"]

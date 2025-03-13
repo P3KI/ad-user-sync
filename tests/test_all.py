@@ -9,6 +9,7 @@ from datetime import datetime
 import subprocess
 
 import dateutil.parser
+import pytest
 from dateutil.relativedelta import relativedelta
 
 from pyad import ADGroup, ADUser, win32Exception, ADContainer
@@ -21,8 +22,12 @@ syncScript     = (basePath / ".." / "user_sync.py").absolute()
 importConfig   = (basePath / "import_config.json").absolute()
 readbackConfig = (basePath / "readback_config.json").absolute()
 
+tests = list(testPath.glob("*"))
+tests.sort()
 
-def run_test(test):
+pytestmark = pytest.mark.parametrize("test", tests)
+
+def test_run(test):
     print("#### Running test {}".format(test))
     os.chdir(test)
 
@@ -36,36 +41,31 @@ def run_test(test):
 
     ret = True
 
-    for stage in stages:
-        if stage is not None:
-            print("  ## Stage '{}'".format(stage))
-            os.chdir(stage)
+    try:
+        for stage in stages:
+            if stage is not None:
+                print("  ## Stage '{}'".format(stage))
+                os.chdir(stage)
 
-        shutil.copy("ResolutionsIn.json", "Resolutions.json")
-        subprocess.run (["python", syncScript, "import", "--config", importConfig])
-        subprocess.run (["python", syncScript, "export", "--config", readbackConfig])
-        os.remove("Resolutions.json")
-
-
-        with open("Expected.json") as f:
-            expected_result = json.load(f)
-        with open("Readback.json") as f:
-            actual_result = json.load(f)
+            shutil.copy("ResolutionsIn.json", "Resolutions.json")
+            subprocess.run (["python", syncScript, "import", "--config", importConfig])
+            subprocess.run (["python", syncScript, "export", "--config", readbackConfig])
+            os.remove("Resolutions.json")
 
 
-        try:
-            compare_lists(expected_result, actual_result)
-        except AssertionError as e:
-            print("FAILURE: Test '{}' failed: {}".format(test, e), file=sys.stderr)
-            ret = False
-            break
-
-        os.remove("Readback.json")
+            with open("Expected.json") as f:
+                expected_result = json.load(f)
+            with open("Readback.json") as f:
+                actual_result = json.load(f)
 
 
-    cleanup(config)
+            try:
+                compare_lists(expected_result, actual_result)
+            finally:
+                os.remove("Readback.json")
 
-    return ret
+    finally:
+        cleanup(config)
 
 
 def compare_lists(expected, actual):
@@ -113,27 +113,3 @@ def cleanup(config):
     for user in managed_user_container.get_children_iter(True, [ADUser]):
         #print("Cleanup user {}".format(user))
         user.delete()
-
-
-count = 0
-failures = 0
-
-if len(sys.argv) == 1:
-    tests = list(testPath.glob("*"))
-    tests.sort()
-
-else:
-    print( sys.argv[1:])
-    tests = map(lambda s : pathlib.Path(s).absolute(), sys.argv[1:])
-
-for test in tests:
-    count += 1
-    if not run_test(test):
-        failures += 1
-
-if failures > 0:
-    print("Test Results: Failed {} of {} tests".format(failures, count))
-    exit(1)
-else:
-    print("Test Results: All {} tests passed!".format(count))
-    exit(0)
