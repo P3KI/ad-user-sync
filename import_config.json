@@ -11,7 +11,7 @@
     "restricted_groups": ["CN=p-Administrators"],
     "prefix_common_names": "P3KI ",
     "expiration_time": "P1M2D",
-    "resolutions_file": "rejections.json",
+    "resolutions_file": "resolutions.json",
     "log_level": "DEBUG",
     "heartbeat_interval": 2
 }

@@ -130,7 +130,7 @@ class ImportConfig(FileBaseModel):
             description=dedent("""
                 A file to write rejected interactions to, so they are not asked for every time.
             """),
-            examples=["rejections.json"],
+            examples=["resolutions.json"],
         ),
     ]
 
