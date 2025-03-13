@@ -18,7 +18,7 @@ bottle = "^0.13.2"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.8.6"
-pyinstaller = "^6.11.1"
+ pyinstaller = "6.12.0"
 
 [tool.poetry.group.test.dependencies]
 pytest = "^25.0.1"
@@ -37,7 +37,7 @@ line-length = 120 # pycharm default. just works well on modern displays.
 "__init__.py" = ["F401"] # ignore unused imports in __init__.py files
 
 [tool.poetry-pyinstaller-plugin]
-version = "^6.12.0"
+version = "6.12.0"
 
 [tool.poetry-pyinstaller-plugin.scripts]
 user-sync = { source = "user_sync.py", type = "onefile" }
