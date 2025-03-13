@@ -5,8 +5,8 @@ import logging
 import sys
 from logging import getLogger
 
-from src.util import document_model
-from src import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users
+from ad_sync.util import document_model
+from ad_sync import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users
 
 arg_parser = argparse.ArgumentParser(
     prog="user_sync.exe",

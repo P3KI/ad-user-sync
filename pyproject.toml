@@ -1,10 +1,10 @@
 [tool.poetry]
-name = "ad-permission-sync"
+name = "ad-sync"
 version = "0.1.0"
 description = "A tool to export users from a Windows Active Directory and import them into another."
 authors = ["Philipp Claves <philipp@p3ki.com>", "Felix Hofmann <felix.hofmann@fxhm.de>"]
 readme = "README.md"
-package-mode = false
+package-mode = true
 
 
 [tool.poetry.dependencies]
@@ -33,3 +33,9 @@ line-length = 120 # pycharm default. just works well on modern displays.
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"] # ignore unused imports in __init__.py files
+
+[tool.poetry-pyinstaller-plugin]
+version = "^6.12.0"
+
+[tool.poetry-pyinstaller-plugin.scripts]
+user-sync = { source = "user_sync.py", type = "onefile" }
