@@ -90,6 +90,10 @@ def compare_users(expected, actual, expected_expiry):
         raise AssertionError("Extra user keys: {}".format(extra_keys))
 
     for key in expected.keys():
+        if key == "memberOf":
+            expected[key].sort()
+            actual[key].sort()
+
         if key == "accountExpires":
             delta = abs((dateutil.parser.parse(actual[key]) - expected_expiry).total_seconds())
             if delta > 600:
