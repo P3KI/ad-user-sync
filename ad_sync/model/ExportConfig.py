@@ -18,14 +18,24 @@ class ExportConfig(FileBaseModel):
         ),
     ]
 
-    base_path: Annotated[
+    user_path: Annotated[
         str,
         Field(
-            title="Base Path",
+            title="User Base Path",
             description=dedent("""
-                Specifies the distinguished name ("dn") of the location in the active directory under which all users and groups are located.
-                If not all users and groups are in one place `base_path` should point to the longest parent path shared by all users 
-                and the optional `search_sub_paths` option should be used to restrict the recursive search for users.
+                Specifies the distinguished name ("dn") of the location in the active directory under which all relevant users are located.
+                If not all users are in one place `user_path` should point to the longest parent path shared by all users.
+            """),
+            examples=["CN=Users,DC=ad,DC=company,DC=com"],
+        ),
+    ]
+
+    group_path: Annotated[
+        str,
+        Field(
+            title="Group Base Path",
+            description=dedent("""
+                Specifies the distinguished name ("dn") of the location in the active directory under which all groups listed in `search_groups` are located.
             """),
             examples=["CN=Users,DC=ad,DC=company,DC=com"],
         ),
@@ -39,8 +49,8 @@ class ExportConfig(FileBaseModel):
             description=dedent("""
                 Specifies which security groups a users must be a member of to be included in the export.
                 If multiple groups are specified, membership in any of these groups is sufficient.
-                Group object paths are relative to `base_path` and are prepended to form a full dn.
-                If not provided all users regardless of group membership are exported (make sure `search_sub_paths` restrictive enough).  
+                Group object paths are relative to `group_path` and are prepended to form a full dn.
+                If not provided all users in `user_path` regardless of group membership are exported (make sure `user_path` restrictive enough).  
             """),
             examples=[["CN=Transfer", "CN=Test"]],
         ),
@@ -59,16 +69,3 @@ class ExportConfig(FileBaseModel):
         ),
     ]
 
-    search_sub_paths: Annotated[
-        List[str] | None,
-        Field(
-            default=None,
-            title="Search Sub-Paths",
-            description=dedent("""
-                Relative paths to search for user objects in the AD. 
-                Use in case not all of `base_path` should be searched recursively. 
-                This sub paths are prepended to `base_path` for user search queries to form a full dn.
-            """),
-            examples=[["CN=TransferUsers1", "CN=TransferUsers2"]],
-        ),
-    ]

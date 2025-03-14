@@ -28,12 +28,12 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
-    base_path: Annotated[
+    group_path: Annotated[
         str,
         Field(
-            title="Base Path",
+            title="Group Base Path",
             description=dedent("""
-                The distinguished name ("dn") of the location in the active directory to witch `managed_user_path` and `group_map` are relative.
+                The distinguished name ("dn") of the location in the active directory to witch `group_map` entries are relative.
                 Usually this will be the `CN=Users` container of the domain, because pre-existing security groups are located there.
             """),
             examples=["CN=Users,DC=ad,DC=company,DC=com"],
@@ -43,16 +43,13 @@ class ImportConfig(FileBaseModel):
     managed_user_path: Annotated[
         str,
         Field(
-            default="CN=P3KI Managed",
             title="Managed User Path",
             description=dedent("""
-                The location new Active Directory user objects are created.
-                The path is relative to `base_path` and is prepended to form a full dn.
+                The distinguished name ("dn") of the location where new Active Directory user objects are created.
                 UserSync does NOT create this path within the Active Directory, it must be created manually before running any import.
-                The default value `CN=P3KI Managed` is suitable if `base_path` points to the `CN=Users` folder.
                 Warning: This path MUST NOT contain any non-managed users otherwise these accounts will be deactivated.   
             """),
-            examples=["CN=P3KI Managed"],
+            examples=["CN=P3KI Managed,CN=Users,DC=ad,DC=company,DC=com"],
         ),
     ]
 
@@ -64,10 +61,10 @@ class ImportConfig(FileBaseModel):
             description=dedent("""
                 Specifies how security group memberships are mapped between source and destination Active Directory.
                 It consists of a dictionary with entries formatted as `"<Source AD group>":"<Target AD group>"`.
-                Source paths are relative to the `base_path` used in the export configuration file.
+                Source paths are relative to the `group_path` used in the export configuration file.
                 Each one should match one `search_groups` entry in the export configuration.
                 Additionally, a `*` entry may be added to specify a group every managed user should be placed in.
-                Target paths are relative to the `base_path` used in the import configuration file.
+                Target paths are relative to the `group_path` used in the import configuration file.
                 If not specified, no group memberships will be assigned to managed users.
             """),
             examples=[

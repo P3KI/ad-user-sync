@@ -25,11 +25,11 @@ def import_users(
 
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
-        k: active_directory.get_group(full_path(config.base_path, v)) for k, v in config.group_map.items()
+        k: active_directory.get_group(full_path(config.group_path, v)) for k, v in config.group_map.items()
     }
 
     # resolve the config RestrictedGroups form AD
-    restricted_groups = [active_directory.get_group(full_path(config.base_path, v)) for v in config.restricted_groups]
+    restricted_groups = [active_directory.get_group(full_path(config.group_path, v)) for v in config.restricted_groups]
 
     # Read users form input file
     with open(config.input_file) as f:
@@ -39,7 +39,7 @@ def import_users(
         logger.info(f"Input: {json.dumps(users_attributes)}")
 
     # The path where all managed users will be created. Defined by ManagedUserPath
-    user_container = active_directory.get_container(full_path(config.base_path, config.managed_user_path))
+    user_container = active_directory.get_container(config.managed_user_path)
 
     # All users imported during this run
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list

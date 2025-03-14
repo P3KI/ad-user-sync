@@ -23,22 +23,24 @@ class AttributeParser:
 
 
 def export_users(config: ExportConfig):
-    confed_sub_path = partial(sub_path, config.base_path)
-    confed_full_path = partial(full_path, config.base_path)
+    make_relative_group_path = partial(sub_path,  config.group_path)
+    # make_relative_user_path  = partial(sub_path,  config.user_path)
+    make_absolute_group_path = partial(full_path, config.group_path)
+    make_absolute_user_path  = partial(full_path, config.user_path)
 
-    query_groups = set(map(confed_full_path, config.search_groups))
+    query_groups = set(map(make_absolute_group_path, config.search_groups))
 
-    def parse_sub_path(v: str) -> str:
-        v = confed_sub_path(v)  # Remove base path
-        pos = v.find(",")
-        return v[pos + 1 :] if pos >= 0 else ""  # Remove common name if present
+    # def parse_sub_path(v: str) -> str:
+    #     v = make_relative_user_path(v)  # Remove base path
+    #     pos = v.find(",")
+    #     return v[pos + 1 :] if pos >= 0 else ""  # Remove common name if present
 
     special_attribute_parsers: Dict[str, AttributeParser] = {
         "disabled": AttributeParser("disabled", "userAccountControl", lambda v: (v & 0x02) != 0),
         "accountExpires": AttributeParser("accountExpires", "accountExpires", convert_ad_datetime),
         # Include search groups memberships only, not all groups. Cut off the base path that all search results share.
-        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(confed_sub_path, query_groups.intersection(v)))),
-        "subPath": AttributeParser("subPath", "distinguishedName", parse_sub_path),
+        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(make_relative_group_path, query_groups.intersection(v)))),
+        # "subPath": AttributeParser("subPath", "distinguishedName", parse_sub_path),
     }
 
     attribute_parsers = list(
@@ -54,17 +56,17 @@ def export_users(config: ExportConfig):
     query_attributes = tuple(map(lambda p: p.source_key, attribute_parsers))
 
     users = []
-    for search_path in map(confed_full_path, config.search_sub_paths or [""]):
-        users_attributes = active_directory.find_users_attributes(
-            attributes=query_attributes,
-            groups=tuple(query_groups),
-            base_dn=search_path,
-        )
 
-        for user_attributes in users_attributes:
-            user = {}
-            for parser in attribute_parsers:
-                parser.apply(user_attributes, user)
-            users.append(user)
+    users_attributes = active_directory.find_users_attributes(
+        attributes=query_attributes,
+        groups=tuple(query_groups),
+        base_dn=config.user_path,
+    )
+
+    for user_attributes in users_attributes:
+        user = {}
+        for parser in attribute_parsers:
+            parser.apply(user_attributes, user)
+        users.append(user)
 
     return users

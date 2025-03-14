@@ -1,7 +1,7 @@
 {
     "input_file": "users.json",
-    "base_path": "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
-    "managed_user_path": "CN=P3KI Managed",
+    "managed_user_path": "CN=P3KI Managed,DC=l4,DC=dev,DC=p3ki,DC=com",
+    "group_path": "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
     "group_map": {
         "CN=t-Administrators" : "CN=p-Administrators",
         "CN=t-Operators"      : "CN=p-Operators",

@@ -108,11 +108,7 @@ def sort_lists(l):
 
 
 def cleanup(config):
-    if len(config.get("managed_user_path", "")) > 0 :
-        managed_user_path = config["managed_user_path"] + "," +  config["base_path"]
-    else:
-        managed_user_path =  config["base_path"]
-
+    managed_user_path = config["managed_user_path"]
     managed_user_container = ADContainer.from_dn(managed_user_path)
     for user in managed_user_container.get_children_iter(True, [ADUser]):
         #print("Cleanup user {}".format(user))
