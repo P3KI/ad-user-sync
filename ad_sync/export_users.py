@@ -26,6 +26,8 @@ def export_users(config: ExportConfig):
     confed_sub_path = partial(sub_path, config.base_path)
     confed_full_path = partial(full_path, config.base_path)
 
+    query_groups = set(map(confed_full_path, config.search_groups))
+
     def parse_sub_path(v: str) -> str:
         v = confed_sub_path(v)  # Remove base path
         pos = v.find(",")
@@ -34,8 +36,8 @@ def export_users(config: ExportConfig):
     special_attribute_parsers: Dict[str, AttributeParser] = {
         "disabled": AttributeParser("disabled", "userAccountControl", lambda v: (v & 0x02) != 0),
         "accountExpires": AttributeParser("accountExpires", "accountExpires", convert_ad_datetime),
-        # Filter out the groups sub-path. Cut off the base path that all search results share.
-        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(confed_sub_path, v))),
+        # Include search groups memberships only, not all groups. Cut off the base path that all search results share.
+        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(confed_sub_path, query_groups.intersection(v)))),
         "subPath": AttributeParser("subPath", "distinguishedName", parse_sub_path),
     }
 
@@ -49,14 +51,13 @@ def export_users(config: ExportConfig):
     # create a cached active directory instance for accessing AD
     active_directory = CachedActiveDirectory()
 
-    query_groups = tuple(map(confed_full_path, config.search_groups))
     query_attributes = tuple(map(lambda p: p.source_key, attribute_parsers))
 
     users = []
     for search_path in map(confed_full_path, config.search_sub_paths or [""]):
         users_attributes = active_directory.find_users_attributes(
             attributes=query_attributes,
-            groups=query_groups,
+            groups=tuple(query_groups),
             base_dn=search_path,
         )
 

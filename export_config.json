@@ -1,7 +1,7 @@
 {
     "export_file" : "users.json",
     "base_path" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
-    "search_groups" : ["CN=Transfer"],
+    "search_groups" : ["CN=Transfer", "CN=t-Viewers", "CN=t-Operators", "CN=t-Administrators"],
     "attributes":[
         "displayName",
         "givenName",
