@@ -1,3 +1,4 @@
+import argparse
 import json
 from datetime import datetime
 from logging import Logger
@@ -9,9 +10,10 @@ from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
 from .model.Action import DisableAction, LeaveAction
 from .util import not_none, full_path
-
+from .mac import read_with_mac
 
 def import_users(
+    args: argparse.Namespace,
     config: ImportConfig,
     logger: Logger,
     resolutions: ResolutionList = None,
@@ -33,7 +35,7 @@ def import_users(
 
     # Read users form input file
     with open(config.input_file) as f:
-        users_attributes: List[Dict[str, Any]] = json.load(f)
+        users_attributes: List[Dict[str, Any]] = json.loads(read_with_mac(f, args.hmac_key))
 
     if config.log_input_file_content:
         logger.info(f"Input: {json.dumps(users_attributes)}")

@@ -1,6 +1,6 @@
+import argparse
 import json
 import os
-import signal
 import sys
 import time
 import webbrowser
@@ -31,10 +31,11 @@ static_file_path = resource_path("templates/static")
 
 
 def interactive_import(
+    args: argparse.Namespace,
     config: InteractiveImportConfig,
     logger: Logger,
 ) -> ImportResult:
-    session = InteractiveSession(config=config, logger=logger)
+    session = InteractiveSession(args=args, config=config, logger=logger)
 
     @bottle.get("/static/<filepath:path>")
     def static(filepath):
@@ -91,6 +92,7 @@ def interactive_import(
 
 class InteractiveSession:
     # general
+    args: argparse.Namespace
     config: InteractiveImportConfig
     logger: Logger
     tag: str
@@ -109,7 +111,8 @@ class InteractiveSession:
     exported_passwords: int
     port: int
 
-    def __init__(self, config: InteractiveImportConfig, logger: Logger):
+    def __init__(self, args : argparse.Namespace, config: InteractiveImportConfig, logger: Logger):
+        self.args = args
         self.config = config
         self.logger = logger
         self.tag = random_string(6)
@@ -166,6 +169,7 @@ class InteractiveSession:
         try:
             self.result.update(
                 import_users(
+                    args=self.args,
                     config=self.config,
                     resolutions=resolutions,
                     logger=self.logger.getChild("import"),

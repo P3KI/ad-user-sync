@@ -6,7 +6,7 @@ import sys
 from logging import getLogger
 
 from ad_sync.util import document_model
-from ad_sync import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users
+from ad_sync import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users, mac
 
 arg_parser = argparse.ArgumentParser(
     prog="user_sync.exe",
@@ -34,6 +34,10 @@ import_arg_parser.add_argument(
     help="Start an interactive import session",
 )
 
+import_arg_parser.add_argument("--hmac",
+                               dest="hmac_key",
+                               help="Verify HMAC on the input file using a shared key")
+
 export_arg_parser = subparsers.add_parser(
     name="export",
     help="Export Users",
@@ -46,6 +50,10 @@ export_arg_parser.add_argument(
     default="export_config.json",
     help="Configuration file to use. See README.",
 )
+
+export_arg_parser.add_argument("--hmac",
+                               dest="hmac_key",
+                               help="Add HMAC to output file using a shared key")
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
@@ -77,6 +85,7 @@ if __name__ == "__main__":
             )
             logger.setLevel(logging.getLevelNamesMapping()[config.log_level])
             result = interactive_import(
+                args=args,
                 config=config,
                 logger=logger,
             )
@@ -86,6 +95,7 @@ if __name__ == "__main__":
             config = ImportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
             logger.setLevel(logging.getLevelNamesMapping()[config.log_level])
             result = import_users(
+                args=args,
                 config=config,
                 logger=logger,
                 resolutions=ResolutionList.load(
@@ -105,7 +115,8 @@ if __name__ == "__main__":
         users = export_users(config=config)
         if config.export_file:
             with open(config.export_file, "w") as f:
-                json.dump(users, f, ensure_ascii=False, indent=4)
+                json = json.dumps(users, ensure_ascii=False, indent=4)
+                mac.writes_with_mac(f, args.hmac_key, json)
         else:
             print(json.dumps(users, ensure_ascii=False, indent=4))
 
