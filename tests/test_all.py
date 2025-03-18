@@ -54,9 +54,9 @@ def test_run(test):
 
 
             with open("Expected.json") as f:
-                expected_result = json.load(f)
+                expected_result = json.load(f)["users"]
             with open("Readback.json") as f:
-                actual_result = json.load(f)
+                actual_result = json.load(f)["users"]
 
 
             try:

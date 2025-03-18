@@ -10,7 +10,7 @@ from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
 from .model.Action import DisableAction, LeaveAction
 from .util import not_none, full_path
-from .mac import read_with_mac
+from .user_file import UserFile
 
 def import_users(
     args: argparse.Namespace,
@@ -35,7 +35,7 @@ def import_users(
 
     # Read users form input file
     with open(config.input_file) as f:
-        users_attributes: List[Dict[str, Any]] = json.loads(read_with_mac(f, args.hmac_key))
+        users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
 
     if config.log_input_file_content:
         logger.info(f"Input: {json.dumps(users_attributes)}")

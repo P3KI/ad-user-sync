@@ -1,20 +1,22 @@
-[
-    {
-        "givenName": "Test3",
-        "company": "ACME",
-        "sAMAccountName": "test3",
-        "cn": "Test3",
-        "displayName": "Test3DN",
-        "l": null,
-        "memberOf": [
-            "CN=t-Administrators",
-            "CN=Transfer"
-        ],
-        "mail": "test3@acme.com",
-        "disabled": false,
-        "accountExpires": null,
-        "sn": "Test3SN",
-        "c": "be",
-        "department": null
-    }
-]
+{
+    "users": [
+        {
+            "givenName": "Test3",
+            "company": "ACME",
+            "sAMAccountName": "test3",
+            "cn": "Test3",
+            "displayName": "Test3DN",
+            "l": null,
+            "memberOf": [
+                "CN=t-Administrators",
+                "CN=Transfer"
+            ],
+            "mail": "test3@acme.com",
+            "disabled": false,
+            "accountExpires": null,
+            "sn": "Test3SN",
+            "c": "be",
+            "department": null
+        }
+    ]
+}

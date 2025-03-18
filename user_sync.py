@@ -6,7 +6,8 @@ import sys
 from logging import getLogger
 
 from ad_sync.util import document_model
-from ad_sync import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users, mac
+from ad_sync import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users
+from ad_sync.user_file import UserFile
 
 arg_parser = argparse.ArgumentParser(
     prog="user_sync.exe",
@@ -115,8 +116,7 @@ if __name__ == "__main__":
         users = export_users(config=config)
         if config.export_file:
             with open(config.export_file, "w") as f:
-                json = json.dumps(users, ensure_ascii=False, indent=4)
-                mac.writes_with_mac(f, args.hmac_key, json)
+                UserFile.write(config.export_file, args.hmac_key, users)
         else:
             print(json.dumps(users, ensure_ascii=False, indent=4))
 
