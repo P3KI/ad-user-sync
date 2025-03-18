@@ -23,12 +23,13 @@ from .util import format_validation_error, random_string, KillableThread, find_f
 def resource_path(relative_path) -> Path:
     if hasattr(sys, '_MEIPASS'):
         return Path(str(os.path.join(sys._MEIPASS, relative_path)))
-    return Path(os.path.join(os.path.abspath("."), relative_path))
+    return Path(os.path.join(os.path.abspath("."), "templates", relative_path))
 
 
-bottle.TEMPLATE_PATH.append(resource_path("templates"))
-static_file_path = resource_path("templates/static")
+bottle.TEMPLATE_PATH.append(resource_path(""))
+static_file_path = resource_path("static")
 
+print(static_file_path)
 
 def interactive_import(
     args: argparse.Namespace,

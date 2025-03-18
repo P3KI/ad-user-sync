@@ -10,7 +10,7 @@ from ad_sync import interactive_import, InteractiveImportConfig, import_users, I
 from ad_sync.user_file import UserFile
 
 arg_parser = argparse.ArgumentParser(
-    prog="user_sync.exe",
+    prog="user-sync.exe",
     description="Import/Export Windows ActiveDirectory user accounts",
     add_help=True,
     exit_on_error=True,

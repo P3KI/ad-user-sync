@@ -6,19 +6,19 @@ the user must provide means to transfer this file from the exporting to the impo
 
 
 ## Exporting
-First create a config file. Run `user_sync.exe export --help` to see what parameters are supported.
+First create a config file. Run `user-sync.exe export --help` to see what parameters are supported.
 
 ### Export Users to file
 To export users just run:
 ```
-user_sync.exe export
+user-sync.exe export
 ```
 By default, the config is read from `export-config.json`, but a different filename can be specified with the 
 `--config CONFIG_FILE` option.
 
 
 ## Importing users ##
-First create a config file. Run `user_sync.exe import --help` to see what parameters are supported.
+First create a config file. Run `user-sync.exe import --help` to see what parameters are supported.
 The Active Directory path specified using `managed_user_path` in the configuration must also be created manually before first use.
 
 Import mode creates new active directory users or updates the attributes of previously create ones to match the data found
@@ -30,7 +30,7 @@ Managed users that have been previously created are never deleted, but deactivat
 ### Importing Users from file 
 To import users just run:
 ```
-user_sync.exe import
+user-sync.exe import
 ```
 By default, the config is read from `import-config.json`, but a different filename can be specified with the 
 `--config CONFIG_FILE` option.
@@ -45,7 +45,7 @@ The import process is not fully automatic. Some actions require manual approval.
 
 These cases can be resolved interactively with the `--interactive` flag:
 ```
-user_sync.exe import --interactive
+user-sync.exe import --interactive
 ```
 
 A Browser window should open up and guide you through accepting or rejecting these actions.
@@ -79,6 +79,6 @@ Then execute the `user_sync.py` with arguments like described above.
 
 To build the executable run:
 ```
-poetry run pyinstaller -F --hiddenimport=win32timezone --add-data=templates:templates --distpath=. .\user_sync.py
+poetry build
 ```
 
