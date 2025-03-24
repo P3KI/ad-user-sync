@@ -16,7 +16,6 @@ user-sync.exe export
 By default, the config is read from `export-config.json`, but a different filename can be specified with the 
 `--config CONFIG_FILE` option.
 
-
 ## Importing users ##
 First create a config file. Run `user-sync.exe import --help` to see what parameters are supported.
 The Active Directory path specified using `managed_user_path` in the configuration must also be created manually before first use.
@@ -64,6 +63,21 @@ Feel free to pipe these outputs wherever you like.
 - Quite some more stuff is written to `DEBUG`
 
 The used level can be set through the `log_level` config parameter.
+
+## Hash-based message authentication code (HMAC)
+
+A message authentication code can be added to the export output file. This is used to check for a corrupted file when importing.
+To add the HMAC specify the `--hmac SHARED_SECRET` option to the export command line:
+```
+user-sync.exe export --hmac d8b1619ae68eec643255a74014233f6d
+```
+This will add another line with the calculated to the message authentication code output.
+Because it is added as an extra line, the output will _no longer be JSON compliant_.
+
+If a `--hmac` option is specified during export, it *must* also be specified during import and *must* use the exact same shared secret.
+```
+user-sync.exe import --hmac d8b1619ae68eec643255a74014233f6d
+```
 
 ## Development
 Make sure you got [python >=3.13](https://www.python.org/downloads/) and [poetry](https://python-poetry.org/docs/)
