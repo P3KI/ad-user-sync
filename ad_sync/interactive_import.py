@@ -29,8 +29,6 @@ def resource_path(relative_path) -> Path:
 bottle.TEMPLATE_PATH.append(resource_path(""))
 static_file_path = resource_path("static")
 
-print(static_file_path)
-
 def interactive_import(
     args: argparse.Namespace,
     config: InteractiveImportConfig,
