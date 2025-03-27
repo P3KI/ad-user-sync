@@ -119,6 +119,31 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
+    users_can_not_change_password: Annotated[
+        bool,
+        Field(
+            default=False,
+            title="Managed Users can not change the password set for them",
+            description=dedent("""                
+                If set to true, managed users will not be able to change their password.
+                This user account flag will be applied when setting a user password during interactive import.  
+            """),
+            examples=[False],
+        ),
+    ]
+
+    users_must_change_password: Annotated[
+        bool,
+        Field(
+            default=False,
+            title="Managed Users must change the password on first login",
+            description=dedent("""                
+                If set to true, managed users must change their password on the first login after interactive import.
+                This user account flag will be applied when setting a user password during interactive import.  
+            """),
+            examples=[False],
+        ),
+    ]
     resolutions_file: Annotated[
         Path,
         Field(

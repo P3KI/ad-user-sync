@@ -112,6 +112,7 @@ def import_users(
                     # resolved action was found and it got accepted
                     try:
                         user.set_password(enable_resolution.password)
+                        update_user_password_settings(user, config)
                         user.enable()
                         result.add_enabled(user)
                         logger.info(f"{user.cn}: Was enabled (accepted manually)")
@@ -318,3 +319,47 @@ def create_user(
 
         # it was another problem. re-raise exception
         raise
+
+
+def update_user_password_settings(user : ADUser, config : ImportConfig):
+    if config.users_must_change_password:
+        user.force_pwd_change_on_login()
+
+    set_user_cant_change_password(user, config.users_can_not_change_password)
+
+    user.set_user_account_control_setting("PASSWD_NOTREQD", False)
+
+# Based on https://blog.steamsprocket.org.uk/2011/07/04/user-cannot-change-password-using-python/
+# and https://learn.microsoft.com/en-us/windows/win32/adsi/modifying-user-cannot-change-password-ldap-provider
+# A users ability to change its password is not a simple AD attribute,
+# instead it is a permission governed by the user objects ACL (Access Control List).
+# (This means we could technically give permission to change this users password to other users.)
+# The relevant ACL entries is selected by GUID (ObjectType) and user (Trustee)
+# We change the permission entry for the user to which the ACL belongs (self) and the all users entry (everyone).
+def set_user_cant_change_password(user : ADUser, disallow_change_password : bool):
+    import win32security
+
+    GUID_CHANGE_PASSWORD = '{ab721a53-1e2f-11d0-9819-00aa0040529b}'
+    SID_SELF     = "S-1-5-10" #The user to which this ACL is attached
+    SID_EVERYONE = "S-1-1-0"  #Every user on the system
+
+    selfAccount     = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_SELF))
+    everyoneAccount = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_EVERYONE))
+    #Format the same way as ACL entries (<domain>\<name>)
+    selfName        = ("%s\\%s" % (selfAccount[1], selfAccount[0])).strip('\\')
+    everyoneName    = ("%s\\%s" % (everyoneAccount[1], everyoneAccount[0])).strip('\\')
+
+    user_priv = user._ldap_adsi_obj
+    security_descriptor = user_priv.ntSecurityDescriptor
+    acl = security_descriptor.DiscretionaryAcl
+
+    for entry in acl:
+        if entry.ObjectType.lower() == GUID_CHANGE_PASSWORD:
+            if entry.Trustee == selfName or entry.Trustee == everyoneName:
+                if disallow_change_password:
+                    entry.AceType = win32security.ACCESS_DENIED_OBJECT_ACE_TYPE
+                else:
+                    entry.AceType = win32security.ACCESS_ALLOWED_OBJECT_ACE_TYPE
+
+    security_descriptor.DiscretionaryAcl = acl
+    user_priv.ntSecurityDescriptor = security_descriptor
