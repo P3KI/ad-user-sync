@@ -24,6 +24,22 @@
     'name': 'Account Name Conflict',
 } %}
 
+{% set accept_button_labels = {
+    'enable': 'Enable with password',
+    'disable': 'Disable now',
+    'join': 'Allow join',
+    'leave': 'Remove from group',
+    'name': 'Accept changes',
+} %}
+
+{% set reject_button_labels = {
+    'enable': 'Keep disabled',
+    'disable': 'Leave to expire',
+    'join': 'Reject',
+    'leave': 'Keep in group',
+    'name': 'Reject user',
+} %}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -260,14 +276,14 @@
                                     type="submit"
                                     name="accept"
                                     value="true"
-                                >Accept</button>
+                                >{{ accept_button_labels[action.type] }}</button>
                                 <button
                                     id="{{ action_id }}.reject"
                                     class="reject-button"
                                     type="submit"
                                     name="accept"
                                     value="false"
-                                >Reject</button>
+                                >{{ reject_button_labels[action.type] }}</button>
                             </div>
                         </td>
                     </tr>
