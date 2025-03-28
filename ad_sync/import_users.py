@@ -35,8 +35,7 @@ def import_users(
     restricted_groups = [active_directory.get_group(full_path(config.group_path, v)) for v in config.restricted_groups]
 
     # Read users form input file
-    with open(config.input_file) as f:
-        users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
+    users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
 
     if config.log_input_file_content:
         logger.info(f"Input: {json.dumps(users_attributes)}")
