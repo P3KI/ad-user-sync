@@ -4,6 +4,7 @@ from datetime import datetime
 from logging import Logger
 from typing import Dict, List, Any, Set
 
+from pywintypes import com_error
 from pyad import ADGroup, ADUser, win32Exception, ADContainer
 
 from .active_directory import CachedActiveDirectory
@@ -60,7 +61,14 @@ def import_users(
         user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
 
         # Retrieve existing user, if present
-        user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
+
+        name_resolution = resolutions.get_name(cn, account_name)
+        # If the user selected to resolve a name conflict by taking over the existing account, we need to search for that
+        if (name_resolution is not None) and name_resolution.is_accepted and name_resolution.take_over_account:
+            user = active_directory.find_single_user(user_container.get_domain() , f"sAMAccountName = '{account_name}'")
+        else:
+            user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
+
 
         # Handle disabled users
         if disable:
@@ -86,6 +94,20 @@ def import_users(
                 # go to next user to import if creation failed
                 continue
         else:
+            if user.parent_container != user_container:
+                user.move(user_container)
+
+            if user.get_attribute("cn", False) != cn:
+                try:
+                    user.rename(cn, False)
+                    #HACK: `ADObject.rename()` crashes out because `self.get_attribute("distinguishedName")` does still return the old dn for unknown reasons.
+                    #      Catch it and update the user object manually.
+                except com_error as ex:
+                    if (ex.excepinfo[5] & 0xFFFFFFFF) == 0x80072030:
+                        user = ADUser.from_dn("CN=" + cn + "," + user_container.dn)
+                    else:
+                        raise
+
             # update the attributes of existing user
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
             if user_attributes != old_attributes:

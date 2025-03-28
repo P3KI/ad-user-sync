@@ -218,16 +218,38 @@
                                 >🗘</button>
 
                             {% elif action.type == 'name' %}
-
-                                <label for="{{ action_id }}.new-name">New Name</label>
-                                <input
-                                    id="{{ action_id }}.new-name"
-                                    class="new-name-input"
-                                    type="text"
-                                    name="new_name"
-                                    value="{{ action.input_name }}"
-                                    autocomplete="off"
-                                />
+                                <div>
+                                    <input type="radio"
+                                           id="{{ action_id }}.take-over-account-true"
+                                           class="take-over-account-input"
+                                           name="take_over_account"
+                                           value="true"
+                                           {% if action.take_over_account %}
+                                                checked="checked"
+                                           {% endif %}
+                                    />
+                                    <label for="{{ action_id }}.take-over-account-true">Take over conflicting account</label>
+                                </div>
+                                <div>
+                                    <input type="radio"
+                                           id="{{ action_id }}.take-over-account-false"
+                                           class="take-over-account-input"
+                                           name="take_over_account"
+                                           value="false"
+                                           {% if not action.take_over_account %}
+                                                checked="checked"
+                                           {% endif %}
+                                    />
+                                    <label for="{{ action_id }}.take-over-account-false">Rename new account:</label>
+                                    <input
+                                        id="{{ action_id }}.new-name"
+                                        class="new-name-input"
+                                        type="text"
+                                        name="new_name"
+                                        value="{{ action.input_name }}"
+                                        autocomplete="off"
+                                    />
+                                </div>
                             {% endif %}
 
                             {# type independent accept/submit #}
@@ -286,12 +308,18 @@
 
             } else if (actionType === 'name') {
                 const newNameInput = document.getElementById(actionId + '.new-name')
+                const takeOverInputTrue = document.getElementById(actionId + '.take-over-account-true')
+                const takeOverInputFalse = document.getElementById(actionId + '.take-over-account-false')
                 const conflictName = document.getElementById(actionId + '.name').value
                 console.log(conflictName)
                 acceptButton.disabled = true
-                newNameInput.addEventListener('input', () => {
-                    acceptButton.disabled = newNameInput.value.length === 0 || newNameInput.value === conflictName
-                })
+                const enableAcceptListener = () => {
+                    acceptButton.disabled = (newNameInput.value.length === 0 || newNameInput.value === conflictName) && takeOverInputFalse.checked
+                    newNameInput.disabled = takeOverInputTrue.checked
+                }
+                newNameInput.addEventListener('input', enableAcceptListener)
+                takeOverInputFalse.addEventListener('input', enableAcceptListener)
+                takeOverInputTrue.addEventListener('input', enableAcceptListener)
             }
         }
 

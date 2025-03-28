@@ -48,6 +48,7 @@ class NameResolution(BaseResolution):
     type: Literal["name"] = "name"
     name: str
     new_name: Annotated[str | None, Field(default="", exclude=True)]
+    take_over_account: Annotated[bool, Field(default=False, exclude=True)]
 
 
 Resolution = Annotated[EnableResolution | DisableResolution | LeaveResolution | JoinResolution | NameResolution, Field(discriminator="type")]
