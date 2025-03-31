@@ -1,22 +1,30 @@
 from functools import lru_cache
+from logging import Logger
 from typing import List, Dict, Any, Tuple
 
 from pyad import ADContainer, ADGroup, ADQuery, ADUser
 
 
 class CachedActiveDirectory:
+    def __init__(self, logger: Logger):
+        self.logger = logger
+
     @lru_cache(maxsize=None)
-    def find_single_user(self, domain: ADContainer | None, where: str) -> ADUser | None:
+    def find_single_user(self, parent: ADContainer | None, where: str) -> ADUser | None:
+        self.logger.debug("Finding existing user account for %s in %s...", where, parent.dn if parent else '(entire domain)')
         query = ADQuery()
         query.execute_query(
             attributes=["distinguishedName"],
             where_clause=f"objectClass = 'user' AND {where}",
-            base_dn=domain.dn if domain else None,
+            base_dn=parent.dn if parent else None,
         )
         if len(query) == 0:
+            self.logger.debug("... Not present.")
             return None
 
         dn = query.get_single_result()["distinguishedName"]
+        self.logger.debug("... Found %s.", dn)
+
         return ADUser.from_dn(dn)
 
     @lru_cache(maxsize=None)

@@ -168,6 +168,17 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
+    log_file: Annotated[
+        str,
+        Field(
+            default=None,
+            title="Log file",
+            description=dedent("""                
+                Sets the file to write log message into. 
+            """),
+            examples=["import.log"],
+        ),
+    ]
     log_level: Annotated[
         LogLevel,
         Field(

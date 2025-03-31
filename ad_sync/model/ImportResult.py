@@ -20,6 +20,8 @@ class ImportResult(BaseModel):
     left: Annotated[Set[Tuple[ADUser, ADGroup]], Field(default_factory=set)]
     required_interactions: Annotated[List[Action], Field(default_factory=list)]
 
+    logger : Annotated[Logger, Field(exclude=True, default=None)]
+
     @field_serializer("enabled", "created", "updated", "disabled")
     def serialize_user_set(self, users: Set[ADUser]) -> List[str]:
         return sorted(map(lambda u: u.cn, users))
@@ -34,6 +36,7 @@ class ImportResult(BaseModel):
         )
 
     def require_interaction(self, action: Action):
+        self.logger.debug("Manual action required: %s", action)
         self.required_interactions.append(action)
 
     def add_created(self, user: ADUser) -> None:

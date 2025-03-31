@@ -13,18 +13,20 @@ from .model.Action import DisableAction, LeaveAction
 from .util import not_none, full_path
 from .user_file import UserFile
 
+
 def import_users(
-    args: argparse.Namespace,
-    config: ImportConfig,
-    logger: Logger,
-    resolutions: ResolutionList = None,
+        args: argparse.Namespace,
+        config: ImportConfig,
+        logger: Logger,
+        resolutions: ResolutionList = None,
 ) -> ImportResult:
     result = ImportResult()
+    result.logger = logger
     # create an empty resolution list if none is provided
     resolutions = resolutions or ResolutionList()
 
     # create a cached active directory instance for accessing AD
-    active_directory = CachedActiveDirectory()
+    active_directory = CachedActiveDirectory(logger)
 
     # resolve the config GroupMap form AD
     group_map: Dict[str, ADGroup] = {
@@ -39,6 +41,8 @@ def import_users(
 
     if config.log_input_file_content:
         logger.info(f"Input: {json.dumps(users_attributes)}")
+    else:
+        logger.info("Input: Importing %s users", len(users_attributes))
 
     # The path where all managed users will be created. Defined by ManagedUserPath
     user_container = active_directory.get_container(config.managed_user_path)
@@ -59,15 +63,15 @@ def import_users(
         user_attributes.pop("subPath", None)  # Currently not used, not a valid AD attribute.
         user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
 
+        logger.debug("==== Importing %s ====", cn)
         # Retrieve existing user, if present
 
         name_resolution = resolutions.get_name(cn, account_name)
         # If the user selected to resolve a name conflict by taking over the existing account, we need to search for that
         if (name_resolution is not None) and name_resolution.is_accepted and name_resolution.take_over_account:
-            user = active_directory.find_single_user(user_container.get_domain() , f"sAMAccountName = '{account_name}'")
+            user = active_directory.find_single_user(user_container.get_domain(), f"sAMAccountName = '{account_name}'")
         else:
             user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
-
 
         # Handle disabled users
         if disable:
@@ -75,6 +79,7 @@ def import_users(
                 # User does not exist locally (manually deleted or never created), just ignore it.
                 continue
             else:
+                logger.debug("%s: User disabled import", user.cn)
                 handle_disabled_user(logger, resolutions, result, user, False)
 
         # Create user or update user attributes
@@ -99,7 +104,7 @@ def import_users(
             if user.get_attribute("cn", False) != cn:
                 try:
                     user.rename(cn, False)
-                    #HACK: `ADObject.rename()` crashes out because `self.get_attribute("distinguishedName")` does still return the old dn for unknown reasons.
+                    # HACK: `ADObject.rename()` crashes out because `self.get_attribute("distinguishedName")` does still return the old dn for unknown reasons.
                     #      Catch it and update the user object manually.
                 except com_error as ex:
                     if (ex.excepinfo[5] & 0xFFFFFFFF) == 0x80072030:
@@ -113,6 +118,8 @@ def import_users(
                 user.update_attributes(user_attributes)
                 result.add_updated(user)
                 logger.info(f"{user.cn}: Attributes were updated")
+            else:
+                logger.debug("%s: Attributes unchanged", user.cn)
 
         # add the user to the list of users, present in the current import list
         current_users.add(user)
@@ -152,7 +159,6 @@ def import_users(
                     # resolved action was found and it got rejected
                     logger.debug(f"{user.cn}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
 
-
         # Add user as a member to managed groups for later processing
         # We can't set group membership fora user directly, instead we have to set user members for groups.
         #   1. Add "*" to `member_of` of the user to also map the catch-all group.
@@ -163,6 +169,8 @@ def import_users(
         for user_group in set(filter(not_none, map(group_map.get, member_of + ["*"]))):
             current_members_by_group[user_group].add(user)
 
+    logger.debug("==== Updating group memberships ====")
+
     # Update memberships of managed groups
     for group, current_group_members in current_members_by_group.items():
         old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
@@ -170,7 +178,7 @@ def import_users(
         # remove users from group if the user is still in the import file, but no longer has the group membership
         removed_members = (old_members - current_group_members) & current_users
         if len(removed_members) > 0:
-            #group.remove_members(removed_members)
+            # group.remove_members(removed_members)
             for user in removed_members:
                 logger.info(f'{user.cn}: Removed from group "{group.cn}" (membership not present in import list)')
                 leave_resolution = resolutions.get_leave(user=user.cn, group=group.cn)
@@ -217,16 +225,19 @@ def import_users(
                     logger.info(f'{user.cn}: Joined restricted group "{group.cn}" (accepted manually)')
                     result.add_joined(user, group)
 
-
+    logger.debug("==== Looking for orphaned user accounts ====")
     # Check of existing users that are not in the import file.
     missing_users = active_directory.find_users(user_container) - current_users
+    logger.debug("Found %i orphaned accounts", len(missing_users))
     for user in missing_users:
+        logger.debug("%s: User account no longer in import", user.cn)
         handle_disabled_user(logger, resolutions, result, user, True)
 
     return result
 
 
-def handle_disabled_user(logger:Logger, resolutions: ResolutionList, result: ImportResult, user: ADUser, deleted: bool):
+def handle_disabled_user(logger: Logger, resolutions: ResolutionList, result: ImportResult, user: ADUser,
+                         deleted: bool):
     # Don't disable user automatically, use interaction.
     if not is_disabled(user):
         disable_resolution = resolutions.get_disable(user.cn)
@@ -242,29 +253,31 @@ def handle_disabled_user(logger:Logger, resolutions: ResolutionList, result: Imp
             logger.info(f"{user.cn}: Disabled user is left to expire")
 
 
-def is_disabled(user : ADUser) -> bool:
+def is_disabled(user: ADUser) -> bool:
     return user._ldap_adsi_obj.AccountDisabled
 
 
 def create_user(
-    cn: str,
-    account_name: str,
-    user_attributes: Dict[str, Any],
-    name_resolution: NameResolution | None,
-    active_directory: CachedActiveDirectory,
-    user_container: ADContainer,
-    logger: Logger,
-    result: ImportResult,
+        cn: str,
+        account_name: str,
+        user_attributes: Dict[str, Any],
+        name_resolution: NameResolution | None,
+        active_directory: CachedActiveDirectory,
+        user_container: ADContainer,
+        logger: Logger,
+        result: ImportResult,
 ) -> ADUser | None:
     # check if there should be a renaming applied for this user
     if name_resolution is not None and name_resolution.is_accepted:
         new_account_name = name_resolution.new_name
+        logger.debug("Creating new user %s (renamed from %s)...", new_account_name, account_name)
     else:
         new_account_name = account_name
+        logger.debug("Creating new user %s...", account_name)
 
     # create a new user
     try:
-        attrs : Dict[str, Any] = user_attributes | {"sAMAccountName": new_account_name}
+        attrs: Dict[str, Any] = user_attributes | {"sAMAccountName": new_account_name}
         if not "userPrincipalName" in attrs:
             # Work around incorrect default UPN set by pyad, by always setting it explicitly.
             attrs["userPrincipalName"] = f"{new_account_name}@{user_container.get_domain().get_default_upn()}"
@@ -291,16 +304,18 @@ def create_user(
 
         # creation failed. check if it was because of a name conflict
         conflict_user = active_directory.find_single_user(
-            domain=None, # user_container.get_domain(),
+            parent=None,  # user_container.get_domain(),
             where=f"sAMAccountName = '{new_account_name}'",
         )
         if conflict_user is not None:
             # name conflict detected -> add required action
             # the action should refer to the account_name from the import file, not a previous renaming
+            logger.debug("User %s with the same account name ('%s') found.", conflict_user.dn, new_account_name)
+
             previous_error = None
             if account_name != new_account_name:
                 conflict_user = active_directory.find_single_user(
-                    domain=user_container.get_domain(),
+                    parent=user_container.get_domain(),
                     where=f"sAMAccountName = '{account_name}'",
                 )
 
@@ -342,13 +357,14 @@ def create_user(
         raise
 
 
-def update_user_password_settings(user : ADUser, config : ImportConfig):
+def update_user_password_settings(user: ADUser, config: ImportConfig):
     if config.users_must_change_password:
         user.force_pwd_change_on_login()
 
     set_user_cant_change_password(user, config.users_can_not_change_password)
 
     user.set_user_account_control_setting("PASSWD_NOTREQD", False)
+
 
 # Based on https://blog.steamsprocket.org.uk/2011/07/04/user-cannot-change-password-using-python/
 # and https://learn.microsoft.com/en-us/windows/win32/adsi/modifying-user-cannot-change-password-ldap-provider
@@ -357,18 +373,18 @@ def update_user_password_settings(user : ADUser, config : ImportConfig):
 # (This means we could technically give permission to change this users password to other users.)
 # The relevant ACL entries is selected by GUID (ObjectType) and user (Trustee)
 # We change the permission entry for the user to which the ACL belongs (self) and the all users entry (everyone).
-def set_user_cant_change_password(user : ADUser, disallow_change_password : bool):
+def set_user_cant_change_password(user: ADUser, disallow_change_password: bool):
     import win32security
 
     GUID_CHANGE_PASSWORD = '{ab721a53-1e2f-11d0-9819-00aa0040529b}'
-    SID_SELF     = "S-1-5-10" #The user to which this ACL is attached
-    SID_EVERYONE = "S-1-1-0"  #Every user on the system
+    SID_SELF = "S-1-5-10"  # The user to which this ACL is attached
+    SID_EVERYONE = "S-1-1-0"  # Every user on the system
 
-    selfAccount     = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_SELF))
+    selfAccount = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_SELF))
     everyoneAccount = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_EVERYONE))
-    #Format the same way as ACL entries (<domain>\<name>)
-    selfName        = ("%s\\%s" % (selfAccount[1], selfAccount[0])).strip('\\')
-    everyoneName    = ("%s\\%s" % (everyoneAccount[1], everyoneAccount[0])).strip('\\')
+    # Format the same way as ACL entries (<domain>\<name>)
+    selfName = ("%s\\%s" % (selfAccount[1], selfAccount[0])).strip('\\')
+    everyoneName = ("%s\\%s" % (everyoneAccount[1], everyoneAccount[0])).strip('\\')
 
     user_priv = user._ldap_adsi_obj
     security_descriptor = user_priv.ntSecurityDescriptor

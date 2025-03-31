@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 import argparse
 import json
-import logging
 import sys
-from logging import getLogger
+
 
 from ad_sync.util import document_model
 from ad_sync import interactive_import, InteractiveImportConfig, import_users, ImportConfig, ResolutionList, ExportConfig, export_users
 from ad_sync.user_file import UserFile
+from ad_sync.logger import Logger
 
 arg_parser = argparse.ArgumentParser(
     prog="user-sync.exe",
@@ -39,6 +39,15 @@ import_arg_parser.add_argument("--hmac",
                                dest="hmac_key",
                                help="Verify HMAC on the input file using a shared key")
 
+import_arg_parser.add_argument("--log", "--logfile",
+                               dest="log_file",
+                               help="Write log output to specified file (overrides config file)")
+
+import_arg_parser.add_argument("--log_level",
+                               dest="log_level",
+                               help="Log level (overrides config file)")
+
+
 export_arg_parser = subparsers.add_parser(
     name="export",
     help="Export Users",
@@ -58,50 +67,35 @@ export_arg_parser.add_argument("--hmac",
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
-
-    logger = getLogger()
-    logger.setLevel(logging.DEBUG)
-    for handler in logger.handlers:
-        logger.removeHandler(handler)
-
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.DEBUG)
-    console_handler.setFormatter(
-        logging.Formatter(
-            fmt="%(asctime)s | %(name)-11s | %(levelname)-8s | %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
-    )
-    logger.addHandler(console_handler)
+    Logger.init(args)
 
     if args.command == "import":
 
         if args.interactive:
-            logger.name = "interactive"
             config = InteractiveImportConfig.load(
                 file=args.config_file,
-                logger=logger,
+                logger=Logger.get(),
                 fallback_default=False,
                 exit_on_fail=True
             )
-            logger.setLevel(logging.getLevelNamesMapping()[config.log_level])
+            Logger.update_from_config(config)
             result = interactive_import(
                 args=args,
                 config=config,
-                logger=logger,
+                logger=Logger.get(),
             )
 
         else:
-            logger.name = "import"
-            config = ImportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
-            logger.setLevel(logging.getLevelNamesMapping()[config.log_level])
+
+            config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+            Logger.update_from_config(config)
             result = import_users(
                 args=args,
                 config=config,
-                logger=logger,
+                logger=Logger.get(),
                 resolutions=ResolutionList.load(
                     file=config.resolutions_file,
-                    logger=logger,
+                    logger=Logger.get(),
                     save_default=True,
                     exit_on_fail=True,
                 ),
@@ -110,8 +104,7 @@ if __name__ == "__main__":
         # write the result to stdout
         print(result.model_dump_json(indent=4))
     elif args.command == "export":
-        logger.name = "export"
-        config = ExportConfig.load(args.config_file, logger=logger, fallback_default=False, exit_on_fail=True)
+        config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
 
         users = export_users(config=config)
         if config.export_file:
