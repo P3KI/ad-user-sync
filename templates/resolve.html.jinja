@@ -95,8 +95,8 @@
 
         .action-type {
             font-weight: bold;
-            border: none;
-            padding-top: 1.5em;
+            margin-bottom: 0.5em;
+            margin-top: 1.5em;
         }
         .action-type-0 {
             padding-top: 0;
@@ -135,26 +135,20 @@
 
     {% if actions | length > 0 %}
         <h2 class="running-only active-only">Required Interactions</h2>
-        <table class="running-only active-only">
-            {% for action in actions %}
-                {% set action_id = loop.index0 %}
-                <form
-                    id="{{ action_id }}"
-                    action-type="{{ action.type }}"
-                    class="action-form"
-                    method="post"
-                >
-                    <input id="{{ action_id }}.tab-id" type="hidden" name="tab_id" value="{{ tab_id }}" />
+
+        {% for action in actions %}
+            {% set action_id = loop.index0 %}
+            <p class="action-type action-type-{{ action_id }}" colspan="2">
+                {{ type_descriptions[action.type] }}
+                {% if action.type == 'disable' and action.deleted %}
+                    (deleted from import)
+                {% endif %}
+            </p>
+            <form id="{{ action_id }}" action-type="{{ action.type }}" class="action-form" method="post" >
+                <input id="{{ action_id }}.type" type="hidden" name="type" value="{{ action.type }}" />
+                <input id="{{ action_id }}.tab-id" type="hidden" name="tab_id" value="{{ tab_id }}" />
+                <table class="running-only active-only">
                     {# type independent action attributes #}
-                    <tr>
-                        <td class="action-type action-type-{{ action_id }}" colspan="2">
-                            {{ type_descriptions[action.type] }}
-                            {% if action.type == 'disable' and action.deleted %}
-                                (deleted from import)
-                            {% endif %}
-                            <input id="{{ action_id }}.type" type="hidden" name="type" value="{{ action.type }}" />
-                        </td>
-                    </tr>
                     <tr>
                         <td>User</td>
                         <td>
@@ -287,10 +281,10 @@
                             </div>
                         </td>
                     </tr>
-                </form>
-            {% endfor %}
-            </table>
-        {% endif %}
+                </table>
+            </form>
+        {% endfor %}
+    {% endif %}
     </div>
 
     <script src="static/wordlist-5-dice-eff.js"></script>
