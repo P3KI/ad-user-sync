@@ -200,9 +200,11 @@ class InteractiveSession:
     def render_import_result(self) -> str:
         self.last_tab_id = random_string(6)
         self.current_result_rendered = True
+        actions = self.result.required_interactions if self.result else []
+        actions.sort(key = lambda a: a.user)
         return jinja2_template(
             "resolve.html.jinja",
-            actions=self.result.required_interactions if self.result else [],
+            actions=actions,
             password_count=len(self.set_passwords),
             password_word_count=self.config.password_word_count,
             tag=self.tag,
