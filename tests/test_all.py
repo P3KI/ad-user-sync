@@ -4,8 +4,7 @@ import pathlib
 import os
 import json
 import shutil
-import sys
-from datetime import datetime
+from datetime import datetime, timezone
 import subprocess
 
 import dateutil.parser
@@ -75,12 +74,13 @@ def compare_lists(expected, actual):
     if len(expected) != len(actual):
         raise AssertionError("Number of imported users differ from expected. Expected: {}\nActual: {}".format(len(expected), len(actual)))
 
-    expected_expiry = datetime.now() + relativedelta(months=1,days=1)
+    now = datetime.now(timezone.utc)
+    expected_expiry = now + relativedelta(months=1,days=2)
 
     for i in range(len(expected)):
-        compare_users(expected[i], actual[i], expected_expiry)
+        compare_users(expected[i], actual[i], now, expected_expiry)
 
-def compare_users(expected, actual, expected_expiry):
+def compare_users(expected, actual, now, expected_expiry):
     missing_keys = set(expected.keys()) - set(actual.keys())
     if len(missing_keys) > 0:
         raise AssertionError("Missing user keys: {}".format(missing_keys))
@@ -95,9 +95,10 @@ def compare_users(expected, actual, expected_expiry):
             actual[key].sort()
 
         if key == "accountExpires":
-            delta = abs((dateutil.parser.parse(actual[key]) - expected_expiry).total_seconds())
+            actual_expiry = dateutil.parser.parse(actual[key]).replace(tzinfo = timezone.utc)
+            delta = abs((actual_expiry - expected_expiry).total_seconds())
             if delta > 600:
-                raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}'".format(actual["cn"], key, expected[key], actual[key]))
+                raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}' ({}) (delta: {}sec now: {})".format(actual["cn"], key, expected_expiry, actual_expiry, actual[key], delta, now))
         else:
             if expected[key] != actual[key]:
                 raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}'".format(actual["cn"], key, expected[key], actual[key]))
