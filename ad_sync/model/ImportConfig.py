@@ -54,25 +54,26 @@ class ImportConfig(FileBaseModel):
     ]
 
     group_map: Annotated[
-        Dict[str, str],
+        Dict[str, List[str]|str],
         Field(
             default_factory=dict,
             title="Group Map",
             description=dedent("""
                 Specifies how security group memberships are mapped between source and destination Active Directory.
-                It consists of a dictionary with entries formatted as `"<Source AD group>":"<Target AD group>"`.
+                It consists of a dictionary with entries formatted as `"<Source AD group>":["<Target AD group 1>","<Target AD group 2>"...]`.
                 Source paths are relative to the `group_path` used in the export configuration file.
                 Each one should match one `search_groups` entry in the export configuration.
                 Additionally, a `*` entry may be added to specify a group every managed user should be placed in.
-                Target paths are relative to the `group_path` used in the import configuration file.
+                Target AD groups may be a single group or list of multiple groups.
+                Target paths are relative to the `group_path` used in the import configuration file. 
                 If not specified, no group memberships will be assigned to managed users.
             """),
             examples=[
                 {
-                    "CN=Administrators": "CN=p-Administrators",
-                    "CN=Operators": "CN=p-Operators",
-                    "CN=Viewers": "CN=p-Viewers",
-                    "*": "CN=p-Managed",
+                    "CN=Administrators": ["CN=p-Administrators"],
+                    "CN=Operators": ["CN=p-Operators"],
+                    "CN=Viewers": ["CN=p-Viewers"],
+                    "*": ["CN=p-Managed"],
                 }
             ],
         ),

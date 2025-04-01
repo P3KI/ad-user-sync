@@ -10,7 +10,7 @@ from pyad import ADGroup, ADUser, win32Exception, ADContainer
 from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
 from .model.Action import DisableAction, LeaveAction
-from .util import not_none, full_path
+from .util import not_none, full_path, union
 from .user_file import UserFile
 
 
@@ -29,9 +29,11 @@ def import_users(
     active_directory = CachedActiveDirectory(logger)
 
     # resolve the config GroupMap form AD
-    group_map: Dict[str, ADGroup] = {
-        k: active_directory.get_group(full_path(config.group_path, v)) for k, v in config.group_map.items()
-    }
+    group_map: Dict[str, Set[ADGroup]] = {}
+    for k, l in config.group_map.items():
+        l = [l] if isinstance(l, str) else l
+        ml : Set[ADGroup] = { active_directory.get_group(full_path(config.group_path, v)) for v in l }
+        group_map[k] = ml
 
     # resolve the config RestrictedGroups form AD
     restricted_groups = [active_directory.get_group(full_path(config.group_path, v)) for v in config.restricted_groups]
@@ -51,7 +53,7 @@ def import_users(
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list
 
     # User memberships for all managed groups are collected here
-    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in group_map.values()}
+    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in union(group_map.values()) }
 
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
@@ -160,13 +162,13 @@ def import_users(
                     logger.debug(f"{user.cn}: Stays disabled (rejected manually at {enable_resolution.timestamp})")
 
         # Add user as a member to managed groups for later processing
-        # We can't set group membership fora user directly, instead we have to set user members for groups.
+        # We can't set group membership for a user directly, instead we have to set user members for groups.
         #   1. Add "*" to `member_of` of the user to also map the catch-all group.
         #   2. Map all given groups to local AD groups according to group_map (unmapped groups will be None).
         #   3. Filter out unmapped groups (`None` values).
         #   4. Remove duplicates by collecting groups in a set.
         # Then add the user as a member to every group.
-        for user_group in set(filter(not_none, map(group_map.get, member_of + ["*"]))):
+        for user_group in set(union(map(group_map.get, member_of + ["*"]))):
             current_members_by_group[user_group].add(user)
 
     logger.debug("==== Updating group memberships ====")

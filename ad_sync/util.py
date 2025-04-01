@@ -2,7 +2,7 @@ import json
 import random
 import string
 import textwrap
-from typing import Any, Type
+from typing import Any, Type, List, Set, Iterable
 import threading
 import ctypes
 import socket
@@ -16,6 +16,13 @@ from pydantic import ValidationError, BaseModel
 def not_none(v: Any) -> bool:
     return v is not None
 
+def union(l : Iterable[Set]) -> Set:
+    result = set()
+    for s in l:
+        if s is not None:
+            result.update(s)
+
+    return result
 
 def random_string(length: int, letters: str = string.ascii_letters + string.digits) -> str:
     return "".join(random.choice(letters) for _ in range(length))

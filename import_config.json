@@ -3,7 +3,7 @@
     "managed_user_path": "CN=P3KI Managed,DC=l4,DC=dev,DC=p3ki,DC=com",
     "group_path": "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
     "group_map": {
-        "CN=t-Administrators" : "CN=p-Administrators",
+        "CN=t-Administrators" : ["CN=p-Administrators","CN=p-Operators"],
         "CN=t-Operators"      : "CN=p-Operators",
         "CN=t-Viewers"        : "CN=p-Viewers",
         "*"                   : "CN=p-Managed"
