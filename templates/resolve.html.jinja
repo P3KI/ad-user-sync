@@ -296,6 +296,7 @@
     <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
         const passwordWordCount = {{ password_word_count or 5 }}
+        const passwordSuffix = '{{ password_suffix or "" }}'
 
         // setup form validations and user interaction
         for (const form of document.getElementsByClassName('action-form')) {
@@ -349,7 +350,7 @@
                 const word = wordlist[Math.floor(Math.random() * wordlist.length)]
                 password += word.charAt(0).toUpperCase() + word.substring(1)
             }
-            return password
+            return password + passwordSuffix
         }
 
         // from here on is tab sync stuff

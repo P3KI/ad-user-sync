@@ -239,3 +239,13 @@ class InteractiveImportConfig(ImportConfig):
             examples=[3],
         ),
     ]
+
+    password_suffix: Annotated[
+        str,
+        Field(
+            default="",
+            title="Password Suffix",
+            description="Static suffix appended to any generated password.",
+            examples=["$#39"],
+        ),
+    ]

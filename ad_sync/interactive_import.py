@@ -207,6 +207,7 @@ class InteractiveSession:
             actions=actions,
             password_count=len(self.set_passwords),
             password_word_count=self.config.password_word_count,
+            password_suffix=self.config.password_suffix,
             tag=self.tag,
             tab_id=self.last_tab_id,
             error=self.error,
