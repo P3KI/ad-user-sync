@@ -1,7 +1,7 @@
 {
     "export_file" : "Readback.json",
     "group_path" : "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
-    "user_path" : "CN=P3KI Managed,CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
+    "user_path" : "CN=P3KI Test,DC=l4,DC=dev,DC=p3ki,DC=com",
     "search_groups" : ["CN=p-Managed", "CN=p-Administrators", "CN=p-Operators", "CN=p-Viewers", "CN=p-Managed"],
     "attributes":[
         "displayName",
