@@ -1,7 +1,7 @@
 from functools import partial
 from typing import Any, Dict, Callable
 
-
+from logging import Logger
 from . import CachedActiveDirectory
 from .model import ExportConfig
 from .util import convert_ad_datetime, full_path, sub_path
@@ -22,7 +22,7 @@ class AttributeParser:
         target[self.target_key] = self.parse(source[self.source_key]) if val is not None else None
 
 
-def export_users(config: ExportConfig):
+def export_users(config: ExportConfig, logger: Logger):
     make_relative_group_path = partial(sub_path,  config.group_path)
     # make_relative_user_path  = partial(sub_path,  config.user_path)
     make_absolute_group_path = partial(full_path, config.group_path)
@@ -51,7 +51,7 @@ def export_users(config: ExportConfig):
     )
 
     # create a cached active directory instance for accessing AD
-    active_directory = CachedActiveDirectory()
+    active_directory = CachedActiveDirectory(logger)
 
     query_attributes = tuple(map(lambda p: p.source_key, attribute_parsers))
 

@@ -15,7 +15,7 @@ class Logger:
     def init(cls, args : argparse.Namespace):
         logger = logging.getLogger()
 
-        if args.log_level is not None:
+        if args.__dict__.get("log_level") is not None:
             level = logging.getLevelNamesMapping()[args.log_level]
             logger.setLevel(level)
             cls.arg_log_level = level
@@ -26,7 +26,7 @@ class Logger:
         for handler in logger.handlers:
             logger.removeHandler(handler)
 
-        if args.log_file is not None:
+        if args.__dict__.get("log_file") is not None:
             log_handler = logging.FileHandler(args.log_file)
             cls.arg_log_file = args.log_file
         else:

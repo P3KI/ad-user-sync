@@ -106,7 +106,7 @@ if __name__ == "__main__":
     elif args.command == "export":
         config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
 
-        users = export_users(config=config)
+        users = export_users(config=config,logger=Logger.get())
         if config.export_file:
             with open(config.export_file, "w") as f:
                 UserFile.write(config.export_file, args.hmac_key, users)
