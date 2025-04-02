@@ -11,13 +11,20 @@ from textwrap import dedent, indent
 
 from pyad import pyadutils
 from pydantic import ValidationError, BaseModel
+from typing_extensions import MutableMapping
 
 
 def not_none(v: Any) -> bool:
     return v is not None
 
+def ensure_list(value: Any) -> Any:
+    return value if isinstance(value, list) else [value]
 
-    return result
+def ensure_list_values(value: Any) -> Any:
+    if isinstance(value, MutableMapping):
+        for k, v in value.items():
+            value[k] = ensure_list(v)
+    return value
 
 def random_string(length: int, letters: str = string.ascii_letters + string.digits) -> str:
     return "".join(random.choice(letters) for _ in range(length))

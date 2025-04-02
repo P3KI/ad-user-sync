@@ -4,9 +4,10 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Annotated, Dict, List
 
-from pydantic import Field
+from pydantic import Field, BeforeValidator
 
 from .FileBaseModel import FileBaseModel
+from ..util import ensure_list_values
 
 
 class LogLevel(StrEnum):
@@ -54,7 +55,7 @@ class ImportConfig(FileBaseModel):
     ]
 
     group_map: Annotated[
-        Dict[str, List[str]|str],
+        Dict[str, List[str]],
         Field(
             default_factory=dict,
             title="Group Map",
@@ -77,6 +78,7 @@ class ImportConfig(FileBaseModel):
                 }
             ],
         ),
+        BeforeValidator(ensure_list_values),
     ]
 
     restricted_groups: Annotated[
@@ -180,6 +182,7 @@ class ImportConfig(FileBaseModel):
             examples=["import.log"],
         ),
     ]
+
     log_level: Annotated[
         LogLevel,
         Field(
