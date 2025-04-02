@@ -2,7 +2,7 @@ import json
 import random
 import string
 import textwrap
-from typing import Any, Type, List, Set, Iterable
+from typing import Any, Type
 import threading
 import ctypes
 import socket
@@ -17,14 +17,17 @@ from typing_extensions import MutableMapping
 def not_none(v: Any) -> bool:
     return v is not None
 
+
 def ensure_list(value: Any) -> Any:
     return value if isinstance(value, list) else [value]
+
 
 def ensure_list_values(value: Any) -> Any:
     if isinstance(value, MutableMapping):
         for k, v in value.items():
             value[k] = ensure_list(v)
     return value
+
 
 def random_string(length: int, letters: str = string.ascii_letters + string.digits) -> str:
     return "".join(random.choice(letters) for _ in range(length))
@@ -115,7 +118,7 @@ def document_model(model: Type[BaseModel]) -> str:
 
         doc += f"[{field}] - {props.get('title')}"
         if required:
-            doc += f" - REQUIRED"
+            doc += " - REQUIRED"
         doc += "\n"
 
         doc += textwrap.indent(dedent(props.get("description", "").strip()), "  ") + "\n"
@@ -127,7 +130,7 @@ def document_model(model: Type[BaseModel]) -> str:
         if "default" in props:
             doc += f"    default: {json.dumps(props['default'], indent=2)}\n"
         elif not required:
-            doc += f"    default: null\n"
+            doc += "    default: null\n"
 
         if "examples" in props:
             for example in props["examples"]:

@@ -1,6 +1,6 @@
 from functools import lru_cache
 from logging import Logger
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Iterable, Set
 
 from pyad import ADContainer, ADGroup, ADQuery, ADUser
 
@@ -11,7 +11,9 @@ class CachedActiveDirectory:
 
     @lru_cache(maxsize=None)
     def find_single_user(self, parent: ADContainer | None, where: str) -> ADUser | None:
-        self.logger.debug("Finding existing user account for %s in %s...", where, parent.dn if parent else '(entire domain)')
+        self.logger.debug(
+            "Finding existing user account for %s in %s...", where, parent.dn if parent else "(entire domain)"
+        )
         query = ADQuery()
         query.execute_query(
             attributes=["distinguishedName"],
@@ -28,21 +30,22 @@ class CachedActiveDirectory:
         return ADUser.from_dn(dn)
 
     @lru_cache(maxsize=None)
-    def find_users(self, parent: ADContainer):
-        return set(parent.get_children_iter(recursive=True, filter= [ADUser]))
-
+    def find_users(self, parent: ADContainer) -> Set[ADUser]:
+        return set(parent.get_children_iter(recursive=True, filter=[ADUser]))
 
     @lru_cache(maxsize=None)
     def find_users_attributes(
         self,
-        attributes: Tuple[str],
+        attributes: Iterable[str],
         base_dn: str,
-        groups: Tuple[str] | None,
+        groups: Iterable[str] | None,
     ) -> List[Dict[str, Any]]:
         where = "objectClass = 'user'"
-        if groups and len(groups) > 0:
-            group_dns = map(lambda g: f"memberOf='{g}'", groups)
-            where += f" AND ({' OR '.join(group_dns)})"
+        if groups is not None:
+            groups = list(groups)
+            if len(groups) > 0:
+                group_dns = map(lambda g: f"memberOf='{g}'", groups)
+                where += f" AND ({' OR '.join(group_dns)})"
         query = ADQuery()
         query.execute_query(
             attributes=list(attributes),

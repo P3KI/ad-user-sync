@@ -1,8 +1,8 @@
 import argparse
 import logging
 
-class Logger:
 
+class Logger:
     log_format = logging.Formatter(
         fmt="%(asctime)s | %(name)-11s | %(levelname)-8s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -22,7 +22,6 @@ class Logger:
         else:
             logger.setLevel(logging.DEBUG)
 
-
         for handler in logger.handlers:
             logger.removeHandler(handler)
 
@@ -39,7 +38,6 @@ class Logger:
 
         cls.instance = logger
 
-
     @classmethod
     def update_from_config(cls, config):
         logger = cls.instance
@@ -47,7 +45,6 @@ class Logger:
         if cls.arg_log_level is None and config.log_level is not None:
             level = logging.getLevelNamesMapping()[config.log_level]
             logger.setLevel(level)
-
 
         if cls.arg_log_file is None and config.log_file is not None:
             log_handler = logging.FileHandler(config.log_file)

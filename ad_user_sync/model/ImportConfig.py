@@ -11,12 +11,12 @@ from ..util import ensure_list_values
 
 
 class LogLevel(StrEnum):
-    CRITICAL = 'CRITICAL'
-    FATAL = 'FATAL'
-    ERROR = 'ERROR'
-    WARNING = 'WARNING'
-    INFO = 'INFO'
-    DEBUG = 'DEBUG'
+    CRITICAL = "CRITICAL"
+    FATAL = "FATAL"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    INFO = "INFO"
+    DEBUG = "DEBUG"
 
 
 class ImportConfig(FileBaseModel):
@@ -171,7 +171,6 @@ class ImportConfig(FileBaseModel):
             """),
         ),
     ]
-
 
     log_file: Annotated[
         str,

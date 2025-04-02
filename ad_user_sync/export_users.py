@@ -23,10 +23,10 @@ class AttributeParser:
 
 
 def export_users(config: ExportConfig, logger: Logger):
-    make_relative_group_path = partial(sub_path,  config.group_path)
+    make_relative_group_path = partial(sub_path, config.group_path)
     # make_relative_user_path  = partial(sub_path,  config.user_path)
     make_absolute_group_path = partial(full_path, config.group_path)
-    make_absolute_user_path  = partial(full_path, config.user_path)
+    make_absolute_user_path = partial(full_path, config.user_path)
 
     query_groups = set(map(make_absolute_group_path, config.search_groups))
 
@@ -39,7 +39,11 @@ def export_users(config: ExportConfig, logger: Logger):
         "disabled": AttributeParser("disabled", "userAccountControl", lambda v: (v & 0x02) != 0),
         "accountExpires": AttributeParser("accountExpires", "accountExpires", convert_ad_datetime),
         # Include search groups memberships only, not all groups. Cut off the base path that all search results share.
-        "memberOf": AttributeParser("memberOf", "memberOf", lambda v: list(map(make_relative_group_path, query_groups.intersection(v)))),
+        "memberOf": AttributeParser(
+            "memberOf",
+            "memberOf",
+            lambda v: list(map(make_relative_group_path, query_groups.intersection(v))),
+        ),
         # "subPath": AttributeParser("subPath", "distinguishedName", parse_sub_path),
     }
 

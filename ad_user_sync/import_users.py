@@ -248,8 +248,13 @@ def import_users(
     return result
 
 
-def handle_disabled_user(logger: Logger, resolutions: ResolutionList, result: ImportResult, user: ADUser,
-                         deleted: bool):
+def handle_disabled_user(
+    logger: Logger,
+    resolutions: ResolutionList,
+    result: ImportResult,
+    user: ADUser,
+    deleted: bool,
+):
     # Don't disable user automatically, use interaction.
     if not is_disabled(user):
         disable_resolution = resolutions.get_disable(user.cn)
@@ -271,14 +276,14 @@ def is_disabled(user: ADUser) -> bool:
 
 
 def create_user(
-        cn: str,
-        account_name: str,
-        user_attributes: Dict[str, Any],
-        name_resolution: NameResolution | None,
-        active_directory: CachedActiveDirectory,
-        user_container: ADContainer,
-        logger: Logger,
-        result: ImportResult,
+    cn: str,
+    account_name: str,
+    user_attributes: Dict[str, Any],
+    name_resolution: NameResolution | None,
+    active_directory: CachedActiveDirectory,
+    user_container: ADContainer,
+    logger: Logger,
+    result: ImportResult,
 ) -> ADUser | None:
     # check if there should be a renaming applied for this user
     if name_resolution is not None and name_resolution.is_accepted:
@@ -291,7 +296,7 @@ def create_user(
     # create a new user
     try:
         attrs: Dict[str, Any] = user_attributes | {"sAMAccountName": new_account_name}
-        if not "userPrincipalName" in attrs:
+        if "userPrincipalName" not in attrs:
             # Work around incorrect default UPN set by pyad, by always setting it explicitly.
             attrs["userPrincipalName"] = f"{new_account_name}@{user_container.get_domain().get_default_upn()}"
 
@@ -308,7 +313,7 @@ def create_user(
 
         return user
 
-    except win32Exception as e:
+    except win32Exception:
         # creation failed. check if it was because of a cn conflict
         conflict_user = active_directory.find_single_user(None, f"cn = '{cn}'")
         if conflict_user is not None:
@@ -390,15 +395,15 @@ def update_user_password_settings(user: ADUser, config: ImportConfig):
 def set_user_cant_change_password(user: ADUser, disallow_change_password: bool):
     import win32security
 
-    GUID_CHANGE_PASSWORD = '{ab721a53-1e2f-11d0-9819-00aa0040529b}'
+    GUID_CHANGE_PASSWORD = "{ab721a53-1e2f-11d0-9819-00aa0040529b}"
     SID_SELF = "S-1-5-10"  # The user to which this ACL is attached
     SID_EVERYONE = "S-1-1-0"  # Every user on the system
 
     selfAccount = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_SELF))
     everyoneAccount = win32security.LookupAccountSid(None, win32security.GetBinarySid(SID_EVERYONE))
     # Format the same way as ACL entries (<domain>\<name>)
-    selfName = ("%s\\%s" % (selfAccount[1], selfAccount[0])).strip('\\')
-    everyoneName = ("%s\\%s" % (everyoneAccount[1], everyoneAccount[0])).strip('\\')
+    selfName = ("%s\\%s" % (selfAccount[1], selfAccount[0])).strip("\\")
+    everyoneName = ("%s\\%s" % (everyoneAccount[1], everyoneAccount[0])).strip("\\")
 
     user_priv = user._ldap_adsi_obj
     security_descriptor = user_priv.ntSecurityDescriptor

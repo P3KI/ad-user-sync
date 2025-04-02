@@ -32,12 +32,15 @@ class EnableResolution(BaseResolution):
     type: Literal["enable"] = "enable"
     password: Annotated[str | None, Field(default="", exclude=True)]
 
+
 class DisableResolution(BaseResolution):
     type: Literal["disable"] = "disable"
+
 
 class JoinResolution(BaseResolution):
     type: Literal["join"] = "join"
     group: str
+
 
 class LeaveResolution(BaseResolution):
     type: Literal["leave"] = "leave"
@@ -51,7 +54,10 @@ class NameResolution(BaseResolution):
     take_over_account: Annotated[bool, Field(default=False, exclude=True)]
 
 
-Resolution = Annotated[EnableResolution | DisableResolution | LeaveResolution | JoinResolution | NameResolution, Field(discriminator="type")]
+Resolution = Annotated[
+    EnableResolution | DisableResolution | LeaveResolution | JoinResolution | NameResolution,
+    Field(discriminator="type"),
+]
 ResolutionParser = TypeAdapter(Resolution)
 
 R = TypeVar("R", bound=Resolution)
