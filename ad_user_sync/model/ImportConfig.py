@@ -159,18 +159,6 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
-    log_input_file_content: Annotated[
-        bool,
-        Field(
-            default=False,
-            title="Log Input File Content",
-            description=dedent("""                
-                If set, the content of the input file will be written to the log every time it is evaluated. 
-            """),
-            examples=[False],
-        ),
-    ]
-
     log_file: Annotated[
         str,
         Field(

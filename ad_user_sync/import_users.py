@@ -10,20 +10,23 @@ from pyad import ADGroup, ADUser, win32Exception, ADContainer
 from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
 from .model.Action import DisableAction, LeaveAction
-from .util import not_none, full_path, union
+from .util import full_path
 from .user_file import UserFile
 
 
 def import_users(
-        args: argparse.Namespace,
-        config: ImportConfig,
-        logger: Logger,
-        resolutions: ResolutionList = None,
+    args: argparse.Namespace,
+    config: ImportConfig,
+    logger: Logger,
+    resolutions: ResolutionList = None,
 ) -> ImportResult:
+    logger.debug("starting import_users")
+
     result = ImportResult()
     result.logger = logger
     # create an empty resolution list if none is provided
     resolutions = resolutions or ResolutionList()
+    logger.debug(f"{len(resolutions)} resolution(s) provided")
 
     # create a cached active directory instance for accessing AD
     active_directory = CachedActiveDirectory(logger)
@@ -31,25 +34,26 @@ def import_users(
         return active_directory.get_group(full_path(config.group_path, g))
 
     # resolve the config GroupMap form AD
+    logger.debug("loading ad groups for group_map...")
     group_map: Dict[str, Set[ADGroup]] = {}
     for source_group, target_groups in config.group_map.items():
         group_map[source_group] = set(map(get_group, target_groups))
     logger.debug(f"{len(group_map)} group mappings loaded")
 
     # resolve the config RestrictedGroups form AD
-    restricted_groups = [active_directory.get_group(full_path(config.group_path, v)) for v in config.restricted_groups]
+    logger.debug("loading ad groups for restricted_groups...")
     restricted_groups = set(map(get_group, config.restricted_groups))
-
-    # Read users form input file
-    users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
-
-    if config.log_input_file_content:
-        logger.info(f"Input: {json.dumps(users_attributes)}")
-    else:
-        logger.info("Input: Importing %s users", len(users_attributes))
+    logger.debug(f"{len(restricted_groups)} restricted groups loaded.")
 
     # The path where all managed users will be created. Defined by ManagedUserPath
+    logger.debug("loading ad container for managed_user_path...")
     user_container = active_directory.get_container(config.managed_user_path)
+    logger.debug("managed_user_path container loaded.")
+
+    # Read users form input file
+    logger.debug(f"reading users file from {config.users_file}")
+    users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
+    logger.debug(f"users file loaded: {len(users_attributes)} user(s)")
 
     # All users imported during this run
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list
@@ -57,6 +61,7 @@ def import_users(
     # User memberships for all managed groups are collected here
     current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in set().union(*group_map.values()) }
 
+    logger.info(f"syncing {len(users_attributes)} user(s)...")
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
         cn: str = config.prefix_common_names + user_attributes.pop("cn")  # used as key and for user creation
