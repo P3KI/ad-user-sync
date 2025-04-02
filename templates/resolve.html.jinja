@@ -124,7 +124,15 @@
     <div class="running-only">
         <span id="passwords-count">{{ password_count }}</span> new password(s) set
         <span id="passwords-unexported" class="warning"></span>
-        <a id="passwords-export" href="/export-passwords?tag={{ tag }}" class="hidden">export</a>
+        <form
+            id="passwords-export"
+            method="post"
+            target="_blank"
+            action="/export-passwords?tag={{ tag }}"
+        >
+            <input type="text" name="password" placeholder="encryption key" />
+            <input type="submit" value="Export passwords" />
+        </form>
     </div>
 
     {% if error %}

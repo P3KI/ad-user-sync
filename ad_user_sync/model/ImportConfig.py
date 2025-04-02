@@ -237,7 +237,7 @@ class InteractiveImportConfig(ImportConfig):
     password_wordlist: Annotated[
         Path,
         Field(
-            default=Path("wordlist_de.txt"),
+            default="wordlist_de.txt",
             title="Password Word List",
             description="Number of words sampled from the password list to generate a password.",
             examples=[3],

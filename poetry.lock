@@ -405,6 +405,17 @@ packaging = ">=22.0"
 setuptools = ">=42.0.0"
 
 [[package]]
+name = "pyminizip"
+version = "0.2.6"
+description = "A minizip wrapper - To create a password encrypted zip file in python."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pyminizip-0.2.6.tar.gz", hash = "sha256:0a954dd2a65fd72c8b827b83fb806fb4f301075a6ec43e207d3345ab15843a7a"},
+]
+
+[[package]]
 name = "pytest"
 version = "8.3.5"
 description = "pytest: simple powerful testing with Python"
@@ -588,4 +599,4 @@ files = [
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.13,<3.14"
-content-hash = "eeec77bf1af456d55e9d10efe2c2c8371d2bb2060a798c0f00b2cbbd0202c6ca"
+content-hash = "cde264f38b34a264ea9d6660e3aaf135a4af128489ba14c9d0bea5e1d2b38e33"

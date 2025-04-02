@@ -3,6 +3,11 @@ import os
 import sys
 import time
 import webbrowser
+from io import BytesIO
+
+import tempfile
+import pyminizip
+
 from datetime import datetime, timedelta
 from logging import Logger
 from pathlib import Path
@@ -60,14 +65,25 @@ def interactive_import(
             session.run_import(new_resolution=new_resolution)
             return bottle.redirect(f"/?tag={session.tag}")
 
-    @bottle.get("/export-passwords")
+    @bottle.post("/export-passwords")
     def export_passwords():
         session.verify_tag()
-        filename = f"new-ad-passwords_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        bottle.response.headers["Content-Type"] = "text/plain"
-        bottle.response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+        filename = f"ad-user-sync_passwords_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        content = "\n".join(map(":".join, session.set_passwords)) + "\n"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            text_file_path = Path(temp_dir) / f"{filename}.txt"
+            with open(text_file_path, "w")as f:
+                f.write(content)
+            zip_file_path = Path(temp_dir) / f"{filename}.zip"
+
+            pyminizip.compress(str(text_file_path), "", str(zip_file_path), bottle.request.forms["password"], 5)
+            with open(zip_file_path, "rb")as f:
+                zip_bytes = f.read()
+
+        bottle.response.headers["Content-Type"] = "application/zip"
+        bottle.response.headers["Content-Disposition"] = f'attachment; filename="{filename}.zip"'
         session.exported_passwords = len(session.set_passwords)
-        return "\n".join(map(":".join, session.set_passwords)) + "\n"
+        return zip_bytes
 
     @bottle.get("/heartbeat")
     def beat_heart():
