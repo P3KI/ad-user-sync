@@ -119,7 +119,6 @@ class InteractiveSession:
 
         self.error = None
         self.result = ImportResult()
-        self.result.logger = logger
         self.set_passwords = []
         self.last_request = None
         self.last_tab_id = None

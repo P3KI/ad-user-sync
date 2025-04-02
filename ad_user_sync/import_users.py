@@ -8,7 +8,7 @@ from pyad import ADGroup, ADUser, win32Exception, ADContainer
 from .active_directory import CachedActiveDirectory
 from .model import ImportConfig, ResolutionList, NameAction, EnableAction, JoinAction, NameResolution, ImportResult
 from .model.Action import DisableAction, LeaveAction
-from .util import full_path
+from .util import full_path, not_none
 from .user_file import UserFile
 
 
@@ -30,7 +30,11 @@ def import_users(
 
     # helper function to resolve groups from ad according to config
     def get_group(g: str) -> ADGroup:
-        return active_directory.get_group(full_path(config.group_path, g))
+        p = full_path(config.group_path, g)
+        logger.debug(f"loading ad group {p}...")
+        group = active_directory.get_group(p)
+        logger.debug(f"...ad group loaded.")
+        return group
 
     # resolve the config GroupMap form AD
     logger.debug("loading ad groups for group_map...")
@@ -50,7 +54,7 @@ def import_users(
     logger.debug("managed_user_path container loaded.")
 
     # Read users form input file
-    logger.debug(f"reading users file from {config.users_file}")
+    logger.debug(f"reading users file from {config.input_file}")
     users_attributes = UserFile(path=config.input_file, hmac=config.hmac).read()
     logger.debug(f"users file loaded: {len(users_attributes)} user(s)")
 
@@ -111,10 +115,8 @@ def import_users(
                 result=result,
             )
             if user is None:
-                logger.error("creating new user failed.")
                 # go to next user to import if creation failed
                 continue
-            logger.info(f"new user {user.cn} created.")
         else:
             logger.debug("updating user...")
             if user.parent_container != user_container:
@@ -199,7 +201,7 @@ def import_users(
         #   3. Filter out unmapped groups (`None` values).
         #   4. Remove duplicates by collecting groups in a set.
         # Then add the user as a member to every group.
-        for user_group in set().union(*map(group_map.get, member_of + ["*"])):
+        for user_group in set().union(*filter(not_none, map(group_map.get, member_of + ["*"]))):
             current_members_by_group[user_group].add(user)
 
 
@@ -346,14 +348,14 @@ def create_user(
         return user
 
     except win32Exception as e:
-        logger.debug(f"creating failed with exception: {e}. let's see if there is a user with the same cn...")
+        logger.debug(f"creating failed with exception: {str(e).strip()}. let's see if there is a user with the same cn...")
         conflict_user = active_directory.find_single_user(None, f"cn = '{cn}'")
         if conflict_user is not None:
             logger.error(f"{cn}: Unmanaged user with same cn exists.")
             return None
 
         # creation failed. check if it was because of a name conflict
-        logger.debug(f"nope, no user with cn '{cn}' exists. let's see if there is a account name conflict...")
+        logger.debug(f"...nope, no user with cn '{cn}' exists. let's see if there is a account name conflict...")
         conflict_user = active_directory.find_single_user(
             parent=None,  # user_container.get_domain(),
             where=f"sAMAccountName = '{new_account_name}'",
