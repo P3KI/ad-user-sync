@@ -20,13 +20,15 @@ def import_users(
     logger.debug("starting import_users")
 
     result = ImportResult()
-    result.logger = logger
+
     # create an empty resolution list if none is provided
     resolutions = resolutions or ResolutionList()
     logger.debug(f"{len(resolutions)} resolution(s) provided")
 
     # create a cached active directory instance for accessing AD
     active_directory = CachedActiveDirectory(logger)
+
+    # helper function to resolve groups from ad according to config
     def get_group(g: str) -> ADGroup:
         return active_directory.get_group(full_path(config.group_path, g))
 
@@ -56,7 +58,7 @@ def import_users(
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list
 
     # User memberships for all managed groups are collected here
-    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in set().union(*group_map.values()) }
+    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in set().union(*group_map.values())}
 
     logger.info(f"syncing {len(users_attributes)} user(s)...")
     for user_attributes in users_attributes:
@@ -141,7 +143,8 @@ def import_users(
                 enable_resolution = resolutions.get_enable(user.cn)
                 if enable_resolution is None:
                     # no resolved action was found -> add interactive action
-                    result.require_interaction(EnableAction(user=user.cn))
+                    action = result.require_interaction(EnableAction(user=user.cn))
+                    logger.debug(f"Manual action required: {action}")
                 elif enable_resolution.accept is True:
                     # resolved action was found and it got accepted
                     try:
@@ -154,12 +157,13 @@ def import_users(
                         if e.error_info.get("error_code") != "0x800708c5":
                             raise
                         logger.debug(f"{user.cn}: Manually provided password does not match requirements")
-                        result.require_interaction(
+                        action = result.require_interaction(
                             EnableAction(
                                 user=user.cn,
                                 error=e.error_info.get("message", "Password does not meet requirements"),
                             )
                         )
+                        logger.debug(f"Manual action required: {action}")
 
                 else:
                     # resolved action was found and it got rejected
@@ -189,7 +193,8 @@ def import_users(
                 logger.info(f'{user.cn}: Removed from group "{group.cn}" (membership not present in import list)')
                 leave_resolution = resolutions.get_leave(user=user.cn, group=group.cn)
                 if leave_resolution is None:
-                    result.require_interaction(LeaveAction(user=user.cn, group=group.cn))
+                    action = result.require_interaction(LeaveAction(user=user.cn, group=group.cn))
+                    logger.debug(f"Manual action required: {action}")
                 elif leave_resolution.accept is True:
                     group.remove_members([user])
                     result.add_left(user, group)
@@ -213,7 +218,8 @@ def import_users(
                 join_resolution = resolutions.get_join(user=user.cn, group=group.cn)
                 if join_resolution is None:
                     # no resolved action was found  -> add interactive action
-                    result.require_interaction(JoinAction(user=user.cn, group=group.cn))
+                    action = result.require_interaction(JoinAction(user=user.cn, group=group.cn))
+                    logger.debug(f"Manual action required: {action}")
                 elif join_resolution.accept is True:
                     # resolved action was found and it was accepted
                     new_members.append(user)
@@ -249,7 +255,8 @@ def handle_disabled_user(logger: Logger, resolutions: ResolutionList, result: Im
         disable_resolution = resolutions.get_disable(user.cn)
         if disable_resolution is None:
             # No resolution was found -> Add interactive action
-            result.require_interaction(DisableAction(user=user.cn, deleted=deleted))
+            action = result.require_interaction(DisableAction(user=user.cn, deleted=deleted))
+            logger.debug(f"Manual action required: {action}")
         elif disable_resolution.accept is True:
             # Disable action was accepted -> Disable user
             result.add_disabled(user)
@@ -347,7 +354,7 @@ def create_user(
                 previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
 
             if name_resolution is None or name_resolution.is_accepted:
-                result.require_interaction(
+                action = result.require_interaction(
                     NameAction(
                         user=cn,
                         attributes=user_attributes,
@@ -357,6 +364,7 @@ def create_user(
                         error=previous_error,
                     )
                 )
+                logger.debug(f"Manual action required: {action}")
             return None
 
         # it was another problem. re-raise exception
