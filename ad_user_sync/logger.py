@@ -12,7 +12,7 @@ class Logger:
     arg_log_file = None
 
     @classmethod
-    def init(cls, args : argparse.Namespace):
+    def init(cls, args: argparse.Namespace):
         logger = logging.getLogger()
 
         if args.__dict__.get("log_level") is not None:

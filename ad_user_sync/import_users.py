@@ -72,7 +72,7 @@ def import_users(
         user_attributes.pop("subPath", None)  # Currently not used, not a valid AD attribute.
         user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
 
-        logger.debug("==== Importing %s ====", cn)
+        logger.debug(f"==== Importing {cn} ====")
         # Retrieve existing user, if present
 
         name_resolution = resolutions.get_name(cn, account_name)

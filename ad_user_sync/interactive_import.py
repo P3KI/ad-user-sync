@@ -110,7 +110,7 @@ class InteractiveSession:
     exported_passwords: int
     port: int
 
-    def __init__(self, args : argparse.Namespace, config: InteractiveImportConfig, logger: Logger):
+    def __init__(self, args: argparse.Namespace, config: InteractiveImportConfig, logger: Logger):
         self.args = args
         self.config = config
         self.logger = logger

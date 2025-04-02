@@ -2,13 +2,14 @@ import hmac
 import hashlib
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Any
 
 
 class UserFile:
 
     @staticmethod
-    def write(filename, hmac_key : str, users : List[Dict[str, Any]]):
+    def write(filename: Path, hmac_key: str, users: List[Dict[str, Any]]):
         root = {"timestamp": datetime.now().isoformat(), "users": users}
         string = json.dumps(root, ensure_ascii=False, indent=4)
 
@@ -23,7 +24,7 @@ class UserFile:
                 f.write(mac.hexdigest())
 
     @staticmethod
-    def read(filename, hmac_key) -> List[Dict[str, Any]]:
+    def read(filename: Path, hmac_key: str | None) -> List[Dict[str, Any]]:
         with open(filename) as f:
             data = f.read()
 
