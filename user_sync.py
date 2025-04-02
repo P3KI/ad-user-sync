@@ -39,14 +39,6 @@ import_arg_parser.add_argument("--hmac",
                                dest="hmac_key",
                                help="Verify HMAC on the input file using a shared key")
 
-import_arg_parser.add_argument("--log", "--logfile",
-                               dest="log_file",
-                               help="Write log output to specified file (overrides config file)")
-
-import_arg_parser.add_argument("--log_level",
-                               dest="log_level",
-                               help="Log level (overrides config file)")
-
 
 export_arg_parser = subparsers.add_parser(
     name="export",
@@ -67,7 +59,7 @@ export_arg_parser.add_argument("--hmac",
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
-    Logger.init(args)
+    Logger.init(args.command)
 
     if args.command == "import":
 
@@ -78,7 +70,7 @@ if __name__ == "__main__":
                 fallback_default=False,
                 exit_on_fail=True
             )
-            Logger.update_from_config(config)
+            Logger.set_config(config)
             result = interactive_import(
                 args=args,
                 config=config,
@@ -88,7 +80,7 @@ if __name__ == "__main__":
         else:
 
             config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
-            Logger.update_from_config(config)
+            Logger.set_config(config)
             result = import_users(
                 args=args,
                 config=config,

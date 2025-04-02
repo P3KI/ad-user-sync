@@ -138,7 +138,7 @@ class ImportConfig(FileBaseModel):
         Field(
             default=False,
             title="Managed Users must change the password on first login",
-            description=dedent("""                
+            description=dedent("""
                 If set to true, managed users must change their password on the first login after interactive import.
                 This user account flag will be applied when setting a user password during interactive import.  
             """),
@@ -162,7 +162,7 @@ class ImportConfig(FileBaseModel):
         Field(
             default=False,
             title="Log Input File Content",
-            description=dedent("""                
+            description=dedent("""
                 If set, the content of the input file will be written to the log every time it is evaluated. 
             """),
             examples=[False],
@@ -174,7 +174,7 @@ class ImportConfig(FileBaseModel):
         Field(
             default=None,
             title="Log file",
-            description=dedent("""                
+            description=dedent("""
                 Sets the file to write log message into. 
             """),
             examples=["import.log"],
@@ -185,13 +185,45 @@ class ImportConfig(FileBaseModel):
         Field(
             default=LogLevel.DEBUG,
             title="Log Level",
-            description=dedent("""                
+            description=dedent("""
                 Sets the Log Level. 
             """),
             examples=["INFO"],
         ),
     ]
-
+    log_max_bytes: Annotated[
+        int,
+        Field(
+            default=1048576,
+            title="Log file maximum size before rotation",
+            description=dedent("""
+                Sets the maximum size (in bytes) of the log file before rotating it and starting a new one. Default: 1048576 byte (1MiB) 
+            """),
+            examples=[1048576],
+        ),
+    ]
+    log_backup_count: Annotated[
+        int,
+        Field(
+            default=10,
+            title="Log file maximum number of backup files kept",
+            description=dedent("""
+                Sets the maximum number of backup files kept before deleting. Default: 10 
+            """),
+            examples=[10],
+        ),
+    ]
+    log_windows: Annotated[
+        bool,
+        Field(
+            default=False,
+            title="Log to Windows event log",
+            description=dedent("""
+                If set to true, events are written to the windows event log. 
+            """),
+            examples=[10],
+        ),
+    ]
 
 class InteractiveImportConfig(ImportConfig):
     port: Annotated[
