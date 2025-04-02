@@ -125,16 +125,17 @@ def import_users(
                 logger.info(f"{user.cn}: Moved from {user.parent_container.dn} to {user_container.dn}.")
 
             if user.get_attribute("cn", False) != cn:
+                old_cn = user.cn
                 try:
-                    logger.debug(f"rename user from {user.cn} to {cn}...")
+                    logger.debug(f"rename user from {old_cn} to {cn}...")
                     user.rename(cn, False)
-                    logger.info(f"{user.cn}: Renamed to {cn}.")
+                    logger.info(f"{old_cn}: Renamed to {cn}.")
                 except com_error as ex:
                     # HACK: `ADObject.rename()` crashes out because `self.get_attribute("distinguishedName")` does
                     # still return the old dn for unknown reasons... Catch it and update the user object manually.
                     if (ex.excepinfo[5] & 0xFFFFFFFF) == 0x80072030:
                         user = ADUser.from_dn("CN=" + cn + "," + user_container.dn)
-                        logger.info(f"{user.cn}: Renamed to {cn}.")
+                        logger.info(f"{old_cn}: Renamed to {cn}.")
                     else:
                         raise
 
@@ -210,6 +211,9 @@ def import_users(
     # Update memberships of managed groups
     for group, current_group_members in current_members_by_group.items():
         logger.debug(f"updating {group.cn} memberships...")
+        # for some reason get_members sometimes crashes after changes to group members are made before.
+        # so we need to reload the group. AD is a mess.
+        group = active_directory.get_group_uncached(group.dn)
         old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
 
         # remove users from group if the user is still in the import file, but no longer has the group membership

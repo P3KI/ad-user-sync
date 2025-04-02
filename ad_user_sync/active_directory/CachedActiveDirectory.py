@@ -58,6 +58,9 @@ class CachedActiveDirectory:
 
     @lru_cache(maxsize=None)
     def get_group(self, dn: str) -> ADGroup:
+        return self.get_group_uncached(dn)
+
+    def get_group_uncached(self, dn: str) -> ADGroup:
         return ADGroup.from_dn(dn)
 
     @lru_cache(maxsize=None)
