@@ -35,7 +35,7 @@ class FileBaseModel(BaseModel):
                     if fallback_default:
                         logger.debug(f"File {file} is empty. Continue with default {cls.__name__}.")
                     else:
-                        logger.warning(f"File {file} is empty. Can not load {cls.__name__}.")
+                        logger.error(f"File {file} is empty. Can not load {cls.__name__}.")
                         if exit_on_fail:
                             sys.exit(1)
                         else:
@@ -44,7 +44,7 @@ class FileBaseModel(BaseModel):
             if fallback_default:
                 logger.debug(f"File {file} does not exist. Continue with default {cls.__name__}.")
             else:
-                logger.warning(f"File {file} does not exist. Can not load {cls.__name__}.")
+                logger.error(f"File {file} does not exist. Can not load {cls.__name__}.")
                 if exit_on_fail:
                     sys.exit(1)
                 else:
