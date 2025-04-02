@@ -37,17 +37,13 @@ import_arg_parser.add_argument(
     help="Start an interactive import session",
 )
 
-import_arg_parser.add_argument("--hmac",
-                               dest="hmac_key",
-                               help="Verify HMAC on the input file using a shared key")
+import_arg_parser.add_argument("--hmac", dest="hmac", help="Verify HMAC on the input file using a shared key")
 
-import_arg_parser.add_argument("--log", "--logfile",
-                               dest="log_file",
-                               help="Write log output to specified file (overrides config file)")
+import_arg_parser.add_argument(
+    "--log", "--logfile", dest="log_file", help="Write log output to specified file (overrides config file)"
+)
 
-import_arg_parser.add_argument("--log_level",
-                               dest="log_level",
-                               help="Log level (overrides config file)")
+import_arg_parser.add_argument("--log_level", dest="log_level", help="Log level (overrides config file)")
 
 
 export_arg_parser = subparsers.add_parser(
@@ -63,36 +59,30 @@ export_arg_parser.add_argument(
     help="Configuration file to use. See README.",
 )
 
-export_arg_parser.add_argument("--hmac",
-                               dest="hmac_key",
-                               help="Add HMAC to output file using a shared key")
+export_arg_parser.add_argument("--hmac", dest="hmac", help="Add HMAC to output file using a shared key")
 
 if __name__ == "__main__":
     args = arg_parser.parse_args()
     Logger.init(args)
 
     if args.command == "import":
-
         if args.interactive:
             config = InteractiveImportConfig.load(
-                file=args.config_file,
-                logger=Logger.get(),
-                fallback_default=False,
-                exit_on_fail=True
+                file=args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True
             )
+            config.hmac = args.hmac or config.hmac
+
             Logger.update_from_config(config)
             result = interactive_import(
-                args=args,
                 config=config,
                 logger=Logger.get(),
             )
 
         else:
-
             config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+            config.hmac = args.hmac or config.hmac
             Logger.update_from_config(config)
             result = import_users(
-                args=args,
                 config=config,
                 logger=Logger.get(),
                 resolutions=ResolutionList.load(
@@ -108,10 +98,9 @@ if __name__ == "__main__":
     elif args.command == "export":
         config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
 
-        users = export_users(config=config,logger=Logger.get())
+        users = export_users(config=config, logger=Logger.get())
         if config.export_file:
-            with open(config.export_file, "w") as f:
-                UserFile.write(config.export_file, args.hmac_key, users)
+            UserFile(path=config.export_file, hmac=args.hmac).write(users)
         else:
             print(json.dumps(users, ensure_ascii=False, indent=4))
 

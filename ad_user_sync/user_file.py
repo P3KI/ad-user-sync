@@ -1,4 +1,4 @@
-import hmac
+from hmac import HMAC, compare_digest
 import hashlib
 import json
 from datetime import datetime
@@ -7,35 +7,40 @@ from typing import List, Dict, Any
 
 
 class UserFile:
+    path: Path
+    hmac: str | None
 
-    @staticmethod
-    def write(filename: Path, hmac_key: str, users: List[Dict[str, Any]]):
-        root = {"timestamp": datetime.now().isoformat(), "users": users}
-        string = json.dumps(root, ensure_ascii=False, indent=4)
+    def __init__(self, path: Path, hmac: str | None = None):
+        self.path = path
+        self.hmac = hmac
 
-        with open(filename, "w") as f:
-            if hmac_key is None:
-                f.write(string)
-            else:
-                if not string.endswith("\n"):
-                    string += "\n"
-                mac = hmac.new(bytes.fromhex(hmac_key), bytes(string, 'utf-8'), hashlib.sha256)
-                f.write(string)
+    def write(self, users: List[Dict[str, Any]]) -> None:
+        body = json.dumps(
+            dict(
+                timestamp=datetime.now().isoformat(),
+                users=users,
+            ),
+            ensure_ascii=False,
+            indent=4,
+        )
+
+        with open(self.path, "w") as f:
+            f.write(body)
+            if self.hmac:
+                if not body.endswith("\n"):
+                    body += "\n"
+                mac = HMAC(bytes.fromhex(self.hmac), bytes(body, "utf-8"), hashlib.sha256)
                 f.write(mac.hexdigest())
 
-    @staticmethod
-    def read(filename: Path, hmac_key: str | None) -> List[Dict[str, Any]]:
-        with open(filename) as f:
-            data = f.read()
+    def read(self) -> List[Dict[str, Any]]:
+        with open(self.path) as f:
+            body = f.read()
 
-        if hmac_key is None:
-            body = data
-        else:
-            sep = data.rindex("\n")
-            body = data[:sep+1]
-            read_mac = bytes.fromhex(data[sep + 1:])
-            calc_mac = hmac.new(bytes.fromhex(hmac_key), bytes(body, 'utf-8'), hashlib.sha256).digest()
-            if not hmac.compare_digest(read_mac, calc_mac):
+        if self.hmac:
+            body, read_mac = body.rsplit("\n", 1)
+            read_mac = bytes.fromhex(read_mac)
+            calc_mac = HMAC(bytes.fromhex(self.hmac), bytes(body, "utf-8"), hashlib.sha256).digest()
+            if not compare_digest(read_mac, calc_mac):
                 raise ValueError("MAC verification failed")
 
         root = json.loads(body)

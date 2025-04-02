@@ -1,5 +1,3 @@
-import argparse
-import json
 from datetime import datetime
 from logging import Logger
 from typing import Dict, List, Any, Set
@@ -15,7 +13,6 @@ from .user_file import UserFile
 
 
 def import_users(
-    args: argparse.Namespace,
     config: ImportConfig,
     logger: Logger,
     resolutions: ResolutionList = None,
@@ -52,7 +49,7 @@ def import_users(
 
     # Read users form input file
     logger.debug(f"reading users file from {config.users_file}")
-    users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
+    users_attributes = UserFile(path=config.input_file, hmac=config.hmac).read()
     logger.debug(f"users file loaded: {len(users_attributes)} user(s)")
 
     # All users imported during this run

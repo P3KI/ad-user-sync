@@ -11,7 +11,7 @@ from threading import Lock
 from typing import List, Tuple
 
 from pydantic import ValidationError
-from bottle import jinja2_template, cached_property
+from bottle import jinja2_template
 import bottle
 
 from .import_users import import_users
@@ -21,7 +21,7 @@ from .util import format_validation_error, random_string, KillableThread, find_f
 
 
 def resource_path(relative_path) -> Path:
-    if hasattr(sys, '_MEIPASS'):
+    if hasattr(sys, "_MEIPASS"):
         return Path(str(os.path.join(sys._MEIPASS, relative_path)))
     return Path(os.path.join(os.path.abspath("."), "templates", relative_path))
 
@@ -29,12 +29,12 @@ def resource_path(relative_path) -> Path:
 bottle.TEMPLATE_PATH.append(resource_path(""))
 static_file_path = resource_path("static")
 
+
 def interactive_import(
-    args: argparse.Namespace,
     config: InteractiveImportConfig,
     logger: Logger,
 ) -> ImportResult:
-    session = InteractiveSession(args=args, config=config, logger=logger)
+    session = InteractiveSession(config=config, logger=logger)
 
     @bottle.get("/static/<filepath:path>")
     def static(filepath):
@@ -91,7 +91,6 @@ def interactive_import(
 
 class InteractiveSession:
     # general
-    args: argparse.Namespace
     config: InteractiveImportConfig
     logger: Logger
     tag: str
@@ -110,8 +109,7 @@ class InteractiveSession:
     exported_passwords: int
     port: int
 
-    def __init__(self, args: argparse.Namespace, config: InteractiveImportConfig, logger: Logger):
-        self.args = args
+    def __init__(self, config: InteractiveImportConfig, logger: Logger):
         self.config = config
         self.logger = logger
         self.tag = random_string(6)
@@ -129,7 +127,6 @@ class InteractiveSession:
         self.current_result_rendered = True
         self.exported_passwords = 0
         self.port = find_free_port() if self.config.port is None else self.config.port
-
 
     @property
     def unexported_passwords(self) -> int:
@@ -169,7 +166,6 @@ class InteractiveSession:
         try:
             self.result.update(
                 import_users(
-                    args=self.args,
                     config=self.config,
                     resolutions=resolutions,
                     logger=self.logger.getChild("import"),
@@ -201,7 +197,7 @@ class InteractiveSession:
         self.last_tab_id = random_string(6)
         self.current_result_rendered = True
         actions = self.result.required_interactions if self.result else []
-        actions.sort(key = lambda a: a.user)
+        actions.sort(key=lambda a: a.user)
         return jinja2_template(
             "resolve.html.jinja",
             actions=actions,

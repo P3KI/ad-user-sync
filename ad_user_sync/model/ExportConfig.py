@@ -69,3 +69,15 @@ class ExportConfig(FileBaseModel):
         ),
     ]
 
+    hmac: Annotated[
+        str | None,
+        Field(
+            default=None,
+            title="HMAC Key",
+            description=dedent("""
+                A message authentication code can be added to the export output file.
+                This is used to check for a corrupted file when importing.
+                Can be overridden by passing the `--hmac` command line parameter.
+            """),
+        ),
+    ]

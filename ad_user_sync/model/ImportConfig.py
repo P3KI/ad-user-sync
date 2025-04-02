@@ -159,6 +159,20 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
+    hmac: Annotated[
+        str | None,
+        Field(
+            default=None,
+            title="HMAC Key",
+            description=dedent("""
+                Verify HMAC on the input file using a shared key.
+                This is used to check for a corrupted users file.
+                Can be overridden by passing the `--hmac` command line parameter.
+            """),
+        ),
+    ]
+
+
     log_file: Annotated[
         str,
         Field(
