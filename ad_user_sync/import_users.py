@@ -27,16 +27,18 @@ def import_users(
 
     # create a cached active directory instance for accessing AD
     active_directory = CachedActiveDirectory(logger)
+    def get_group(g: str) -> ADGroup:
+        return active_directory.get_group(full_path(config.group_path, g))
 
     # resolve the config GroupMap form AD
     group_map: Dict[str, Set[ADGroup]] = {}
-    for k, l in config.group_map.items():
-        l = [l] if isinstance(l, str) else l
-        ml : Set[ADGroup] = { active_directory.get_group(full_path(config.group_path, v)) for v in l }
-        group_map[k] = ml
+    for source_group, target_groups in config.group_map.items():
+        group_map[source_group] = set(map(get_group, target_groups))
+    logger.debug(f"{len(group_map)} group mappings loaded")
 
     # resolve the config RestrictedGroups form AD
     restricted_groups = [active_directory.get_group(full_path(config.group_path, v)) for v in config.restricted_groups]
+    restricted_groups = set(map(get_group, config.restricted_groups))
 
     # Read users form input file
     users_attributes: List[Dict[str, Any]] = UserFile.read(config.input_file, args.hmac_key)
