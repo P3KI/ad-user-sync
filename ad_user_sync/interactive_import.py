@@ -95,6 +95,7 @@ class InteractiveSession:
     tag: str
     mutex: Lock
     timeout: timedelta | None  # time after which this session detects tabs as closed
+    wordlist: List[str]
 
     # last import_users result
     error: str | None
@@ -125,6 +126,9 @@ class InteractiveSession:
         self.current_result_rendered = True
         self.exported_passwords = 0
         self.port = find_free_port() if self.config.port is None else self.config.port
+
+        with open(config.password_wordlist, "r") as f:
+            self.wordlist = list(filter(lambda w: len(w) > 0, map(str.strip, f.readlines())))
 
     @property
     def unexported_passwords(self) -> int:
@@ -204,6 +208,7 @@ class InteractiveSession:
             tag=self.tag,
             tab_id=self.last_tab_id,
             error=self.error,
+            wordlist=json.dumps(self.wordlist),
         )
 
     def start(self) -> ImportResult:

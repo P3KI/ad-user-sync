@@ -91,7 +91,6 @@ def import_users(
             user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
         logger.debug(f"existing user found: {user.cn}" if user else "no existing user found")
 
-
         # Handle disabled users
         if disable:
             logger.debug("user is set as disabled in import file.")
@@ -205,7 +204,6 @@ def import_users(
         for user_group in set().union(*filter(not_none, map(group_map.get, member_of + ["*"]))):
             current_members_by_group[user_group].add(user)
 
-
     logger.debug("==== updating group memberships ====")
 
     # Update memberships of managed groups
@@ -235,13 +233,13 @@ def import_users(
             # unrestricted groups can just be joined
             approved_new_members = current_group_members - old_members
             if len(approved_new_members) > 0:
-                logger.debug(f'group is unrestricted. joining {len(approved_new_members)}...')
+                logger.debug(f"group is unrestricted. joining {len(approved_new_members)}...")
                 group.add_members(approved_new_members)
                 for user in approved_new_members:
                     result.add_joined(user, group)
                     logger.info(f'{user.cn}: Joined group "{group.cn}"')
             else:
-                logger.debug(f'no joining users for group.')
+                logger.debug(f"no joining users for group.")
         else:
             # joining a restricted group requires a resolved interactive action
             join_candidates = current_group_members - old_members
@@ -352,7 +350,9 @@ def create_user(
         return user
 
     except win32Exception as e:
-        logger.debug(f"creating failed with exception: {str(e).strip()}. let's see if there is a user with the same cn...")
+        logger.debug(
+            f"creating failed with exception: {str(e).strip()}. let's see if there is a user with the same cn..."
+        )
         conflict_user = active_directory.find_single_user(None, f"cn = '{cn}'")
         if conflict_user is not None:
             logger.error(f"{cn}: Unmanaged user with same cn exists.")

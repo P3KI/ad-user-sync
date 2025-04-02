@@ -292,9 +292,8 @@
             </table>
         {% endif %}
     </div>
-
-    <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
+        const wordlist = {{ wordlist }}
         const passwordWordCount = {{ password_word_count or 5 }}
 
         // setup form validations and user interaction
