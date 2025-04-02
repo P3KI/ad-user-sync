@@ -60,7 +60,10 @@ def import_users(
     # User memberships for all managed groups are collected here
     current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in set().union(*group_map.values())}
 
-    logger.info(f"syncing {len(users_attributes)} user(s)...")
+    # expiration date to be set to enabled users
+    user_expiration_date = datetime.now() + config.expiration_time
+
+    logger.debug(f"==== syncing {len(users_attributes)} user(s) ====")
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
         cn: str = config.prefix_common_names + user_attributes.pop("cn")  # used as key and for user creation
@@ -71,27 +74,32 @@ def import_users(
         user_attributes.pop("subPath", None)  # Currently not used, not a valid AD attribute.
         user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
 
-        logger.debug(f"==== Importing {cn} ====")
-        # Retrieve existing user, if present
+        logger.debug(f"syncing user {cn}...")
 
+        # Retrieve existing user, if present
         name_resolution = resolutions.get_name(cn, account_name)
+        logger.debug(f"look for existing user...")
         # If the user selected to resolve a name conflict by taking over the existing account, we need to search for that
         if (name_resolution is not None) and name_resolution.is_accepted and name_resolution.take_over_account:
+            logger.debug(f"name_resolution says take over account {account_name}")
             user = active_directory.find_single_user(user_container.get_domain(), f"sAMAccountName = '{account_name}'")
         else:
             user = active_directory.find_single_user(user_container, f"cn = '{cn}'")
+        logger.debug(f"existing user found: {user.cn}" if user else "no existing user found")
+
 
         # Handle disabled users
         if disable:
+            logger.debug("user is set as disabled in import file.")
             if user is None:
-                # User does not exist locally (manually deleted or never created), just ignore it.
+                logger.debug("user does not exist locally (manually deleted or never created), just ignore it.")
                 continue
             else:
-                logger.debug("%s: User disabled import", user.cn)
                 handle_disabled_user(logger, resolutions, result, user, False)
 
         # Create user or update user attributes
         if user is None:
+            logger.debug("creating new user...")
             user = create_user(
                 cn=cn,
                 account_name=account_name,
@@ -103,41 +111,53 @@ def import_users(
                 result=result,
             )
             if user is None:
+                logger.error("creating new user failed.")
                 # go to next user to import if creation failed
                 continue
+            logger.info(f"new user {user.cn} created.")
         else:
+            logger.debug("updating user...")
             if user.parent_container != user_container:
+                logger.debug(f"move existing user from {user.parent_container.dn} to {user_container.dn}...")
                 user.move(user_container)
+                logger.info(f"{user.cn}: Moved from {user.parent_container.dn} to {user_container.dn}.")
 
             if user.get_attribute("cn", False) != cn:
                 try:
+                    logger.debug(f"rename user from {user.cn} to {cn}...")
                     user.rename(cn, False)
-                    # HACK: `ADObject.rename()` crashes out because `self.get_attribute("distinguishedName")` does still return the old dn for unknown reasons.
-                    #      Catch it and update the user object manually.
+                    logger.info(f"{user.cn}: Renamed to {cn}.")
                 except com_error as ex:
+                    # HACK: `ADObject.rename()` crashes out because `self.get_attribute("distinguishedName")` does
+                    # still return the old dn for unknown reasons... Catch it and update the user object manually.
                     if (ex.excepinfo[5] & 0xFFFFFFFF) == 0x80072030:
                         user = ADUser.from_dn("CN=" + cn + "," + user_container.dn)
+                        logger.info(f"{user.cn}: Renamed to {cn}.")
                     else:
                         raise
 
             # update the attributes of existing user
+            logger.debug("updating user attributes...")
             old_attributes = {k: user.get_attribute(k, False) for k in user_attributes}
             if user_attributes != old_attributes:
                 user.update_attributes(user_attributes)
                 result.add_updated(user)
-                logger.info(f"{user.cn}: Attributes were updated")
+                logger.info(f"{user.cn}: Attributes were updated.")
             else:
-                logger.debug("%s: Attributes unchanged", user.cn)
+                logger.debug(f"{user.cn}: Attributes unchanged.")
 
         # add the user to the list of users, present in the current import list
         current_users.add(user)
 
         if not disable:
             # Extend expiration (disabled users in the import are left to expire)
-            user.set_expiration(datetime.now() + config.expiration_time)
+            logger.debug(f"setting expiration date to {user_expiration_date}...")
+            user.set_expiration(user_expiration_date)
+            logger.info(f"{user.cn}: set expiration date to {user_expiration_date}.")
 
             # Enable the User
             if is_disabled(user):
+                logger.debug("enabling disabled user...")
                 # enabling a disabled existing user requires a resolved interactive action
                 # we do not enable automatically
                 enable_resolution = resolutions.get_enable(user.cn)
@@ -148,11 +168,14 @@ def import_users(
                 elif enable_resolution.accept is True:
                     # resolved action was found and it got accepted
                     try:
+                        logger.debug("setting password...")
                         user.set_password(enable_resolution.password)
+                        logger.debug("password was set. update user password settings...")
                         update_user_password_settings(user, config)
+                        logger.debug("user password settings updated. enabling user...")
                         user.enable()
                         result.add_enabled(user)
-                        logger.info(f"{user.cn}: Was enabled (accepted manually)")
+                        logger.info(f"{user.cn}: Was enabled (accepted manually).")
                     except win32Exception as e:
                         if e.error_info.get("error_code") != "0x800708c5":
                             raise
@@ -179,41 +202,48 @@ def import_users(
         for user_group in set().union(*map(group_map.get, member_of + ["*"])):
             current_members_by_group[user_group].add(user)
 
-    logger.debug("==== Updating group memberships ====")
+
+    logger.debug("==== updating group memberships ====")
 
     # Update memberships of managed groups
     for group, current_group_members in current_members_by_group.items():
+        logger.debug(f"updating {group.cn} memberships...")
         old_members: Set[ADUser] = set(group.get_members(ignore_groups=True))
 
         # remove users from group if the user is still in the import file, but no longer has the group membership
         removed_members = (old_members - current_group_members) & current_users
-        if len(removed_members) > 0:
-            # group.remove_members(removed_members)
-            for user in removed_members:
-                logger.info(f'{user.cn}: Removed from group "{group.cn}" (membership not present in import list)')
-                leave_resolution = resolutions.get_leave(user=user.cn, group=group.cn)
-                if leave_resolution is None:
-                    action = result.require_interaction(LeaveAction(user=user.cn, group=group.cn))
-                    logger.debug(f"Manual action required: {action}")
-                elif leave_resolution.accept is True:
-                    group.remove_members([user])
-                    result.add_left(user, group)
+        logger.debug(f"{len(removed_members)} member(s) to remove")
+        for user in removed_members:
+            logger.debug(f'removing user {user.cn} from group "{group.cn}"...')
+            leave_resolution = resolutions.get_leave(user=user.cn, group=group.cn)
+            if leave_resolution is None:
+                action = result.require_interaction(LeaveAction(user=user.cn, group=group.cn))
+                logger.debug(f"Manual action required: {action}")
+            elif leave_resolution.accept is True:
+                group.remove_members([user])
+                result.add_left(user, group)
+                logger.info(f'{user.cn}: Removed from group "{group.cn}" (membership not present in import list).')
 
         # add members to group that haven't been members before
         if group not in restricted_groups:
             # unrestricted groups can just be joined
-            new_members = current_group_members - old_members
-            if len(new_members) > 0:
-                group.add_members(new_members)
-                for user in new_members:
-                    logger.info(f'{user.cn}: Joined group "{group.cn}"')
+            approved_new_members = current_group_members - old_members
+            if len(approved_new_members) > 0:
+                logger.debug(f'group is unrestricted. joining {len(approved_new_members)}...')
+                group.add_members(approved_new_members)
+                for user in approved_new_members:
                     result.add_joined(user, group)
+                    logger.info(f'{user.cn}: Joined group "{group.cn}"')
+            else:
+                logger.debug(f'no joining users for group.')
         else:
             # joining a restricted group requires a resolved interactive action
-            new_members = []
+            join_candidates = current_group_members - old_members
+            logger.debug(f"group is restricted. processing {len(join_candidates)} candidate(s) to join...")
+            approved_new_members = []
 
             # filter the users that are accepted in the restricted group
-            for user in current_group_members - old_members:
+            for user in join_candidates:
                 # see if there is a resolved action
                 join_resolution = resolutions.get_join(user=user.cn, group=group.cn)
                 if join_resolution is None:
@@ -222,7 +252,7 @@ def import_users(
                     logger.debug(f"Manual action required: {action}")
                 elif join_resolution.accept is True:
                     # resolved action was found and it was accepted
-                    new_members.append(user)
+                    approved_new_members.append(user)
                 else:
                     # resolved action was found and it was rejected
                     logger.debug(
@@ -231,18 +261,19 @@ def import_users(
                     )
 
             # add the approved members to the group
-            if len(new_members) > 0:
-                group.add_members(new_members)
-                for user in new_members:
-                    logger.info(f'{user.cn}: Joined restricted group "{group.cn}" (accepted manually)')
+            if len(approved_new_members) > 0:
+                logger.debug(f"joining {len(approved_new_members)} approved user(s)...")
+                group.add_members(approved_new_members)
+                for user in approved_new_members:
                     result.add_joined(user, group)
+                    logger.info(f'{user.cn}: Joined restricted group "{group.cn}" (accepted manually).')
 
-    logger.debug("==== Looking for orphaned user accounts ====")
+    logger.debug("==== handling orphaned user accounts ====")
     # Check of existing users that are not in the import file.
     missing_users = active_directory.find_users(user_container) - current_users
-    logger.debug("Found %i orphaned accounts", len(missing_users))
+    logger.debug(f"found {len(missing_users)} orphaned account(s).")
     for user in missing_users:
-        logger.debug("%s: User account no longer in import", user.cn)
+        logger.debug(f"{user.cn}: user account no longer in import.")
         handle_disabled_user(logger, resolutions, result, user, True)
 
     return result
@@ -258,6 +289,7 @@ def handle_disabled_user(
     # Don't disable user automatically, use interaction.
     if not is_disabled(user):
         disable_resolution = resolutions.get_disable(user.cn)
+        logger.debug(f"{user.cn}: disabling...")
         if disable_resolution is None:
             # No resolution was found -> Add interactive action
             action = result.require_interaction(DisableAction(user=user.cn, deleted=deleted))
@@ -266,9 +298,9 @@ def handle_disabled_user(
             # Disable action was accepted -> Disable user
             result.add_disabled(user)
             user.disable()
-            logger.info(f"{user.cn}: Was disabled (accepted manually)")
+            logger.info(f"{user.cn}: Was disabled (accepted manually).")
         else:
-            logger.info(f"{user.cn}: Disabled user is left to expire")
+            logger.debug(f"{user.cn}: Disabled user is left to expire.")
 
 
 def is_disabled(user: ADUser) -> bool:
@@ -288,10 +320,10 @@ def create_user(
     # check if there should be a renaming applied for this user
     if name_resolution is not None and name_resolution.is_accepted:
         new_account_name = name_resolution.new_name
-        logger.debug("Creating new user %s (renamed from %s)...", new_account_name, account_name)
+        logger.debug(f"Creating new user {new_account_name} (renamed from {account_name})...")
     else:
         new_account_name = account_name
-        logger.debug("Creating new user %s...", account_name)
+        logger.debug(f"Creating new user {account_name}...")
 
     # create a new user
     try:
@@ -307,38 +339,42 @@ def create_user(
         )
         result.add_created(user)
         if account_name == new_account_name:
-            logger.info(f"{user.cn}: Was created")
+            logger.info(f"{user.cn}: User created.")
         else:
-            logger.info(f"{user.cn}: Was created with renamed account name ({account_name} -> {new_account_name})")
+            logger.info(f"{user.cn}: User created with renamed account name ({account_name} -> {new_account_name})")
 
         return user
 
-    except win32Exception:
-        # creation failed. check if it was because of a cn conflict
+    except win32Exception as e:
+        logger.debug(f"creating failed with exception: {e}. let's see if there is a user with the same cn...")
         conflict_user = active_directory.find_single_user(None, f"cn = '{cn}'")
         if conflict_user is not None:
-            logger.error(f"Unmanaged user with same cn exists: {cn}")
+            logger.error(f"{cn}: Unmanaged user with same cn exists.")
             return None
 
         # creation failed. check if it was because of a name conflict
+        logger.debug(f"nope, no user with cn '{cn}' exists. let's see if there is a account name conflict...")
         conflict_user = active_directory.find_single_user(
             parent=None,  # user_container.get_domain(),
             where=f"sAMAccountName = '{new_account_name}'",
         )
+
         if conflict_user is not None:
             # name conflict detected -> add required action
             # the action should refer to the account_name from the import file, not a previous renaming
-            logger.debug("User %s with the same account name ('%s') found.", conflict_user.dn, new_account_name)
+            logger.debug(f'user with the same account name ("{new_account_name}") found: {conflict_user.dn}')
 
-            previous_error = None
-            if account_name != new_account_name:
-                conflict_user = active_directory.find_single_user(
+            if account_name == new_account_name:
+                previous_error = None
+            else:
+                # edge case:
+                logger.debug(f"check if original name is free in the meantime...")
+                old_name_conflict_user = active_directory.find_single_user(
                     parent=user_container.get_domain(),
                     where=f"sAMAccountName = '{account_name}'",
                 )
 
-                # edge case:
-                if conflict_user is None:
+                if old_name_conflict_user is None:
                     # seems that the original account name is available in the meantime
                     logger.debug(
                         f"Account renaming applied for {cn} ({account_name} -> {new_account_name}) "
@@ -356,6 +392,7 @@ def create_user(
                         result=result,
                     )
 
+                logger.debug(f"no. that one is still taken.")
                 previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
 
             if name_resolution is None or name_resolution.is_accepted:
@@ -373,6 +410,7 @@ def create_user(
             return None
 
         # it was another problem. re-raise exception
+        logger.debug(f"nope, also no account name conflict. no idea what the problem is. re-raise exception.")
         raise
 
 
