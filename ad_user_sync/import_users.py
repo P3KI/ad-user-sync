@@ -53,7 +53,7 @@ def import_users(
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list
 
     # User memberships for all managed groups are collected here
-    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in union(group_map.values()) }
+    current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in set().union(*group_map.values()) }
 
     for user_attributes in users_attributes:
         # Remove attributes that can not be applied using ADUser.update_attributes() function
@@ -168,7 +168,7 @@ def import_users(
         #   3. Filter out unmapped groups (`None` values).
         #   4. Remove duplicates by collecting groups in a set.
         # Then add the user as a member to every group.
-        for user_group in set(union(map(group_map.get, member_of + ["*"]))):
+        for user_group in set().union(*map(group_map.get, member_of + ["*"])):
             current_members_by_group[user_group].add(user)
 
     logger.debug("==== Updating group memberships ====")

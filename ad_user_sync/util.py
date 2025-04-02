@@ -16,11 +16,6 @@ from pydantic import ValidationError, BaseModel
 def not_none(v: Any) -> bool:
     return v is not None
 
-def union(l : Iterable[Set]) -> Set:
-    result = set()
-    for s in l:
-        if s is not None:
-            result.update(s)
 
     return result
 
