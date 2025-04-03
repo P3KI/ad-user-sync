@@ -57,7 +57,7 @@ def interactive_import(
         with session:
             try:
                 new_resolution: Resolution = ResolutionParser.validate_python(bottle.request.forms)
-                logger.debug(f"new resolution via POST: {new_resolution.model_dump(exclude={'timestamp'})}")
+                logger.debug(f"New resolution via POST: {new_resolution.model_dump(exclude={'timestamp'})}")
             except ValidationError as e:
                 session.error = format_validation_error(e, source="HTTP POST Form Data")
                 return session.render_import_result()
@@ -239,14 +239,14 @@ class InteractiveSession:
         )
         bottle_thread.start()
 
-        self.logger.warning(f"session started: {self.url}")
+        self.logger.info(f"Session started: {self.url}")
         webbrowser.open(self.url)
 
         # watch out for terminating events in the main thread
         self._wait_for_terminating_events(bottle_thread)
         bottle_thread.terminate()
         bottle_thread.join(timeout=5)
-        self.logger.warning("session ended")
+        self.logger.info("Session ended")
         return self.result
 
     def _wait_for_terminating_events(
@@ -258,7 +258,7 @@ class InteractiveSession:
         try:
             while 1:
                 if not bottle_thread.is_alive():
-                    # the server thread should not end by itself. this is just for good measure
+                    # the server thread should not end by itself. This is just for good measure
                     self.logger.error("bottle server was stopped somehow")
                     return
 
@@ -266,7 +266,7 @@ class InteractiveSession:
                     tabs_closed_detected = False
                 else:
                     if not tabs_closed_detected:
-                        self.logger.debug("all browser tabs were closed")
+                        self.logger.debug("All browser tabs were closed")
 
                     if self.config.terminate_on_browser_close:
                         if not self.has_unexported_passwords:
@@ -283,7 +283,7 @@ class InteractiveSession:
                     terminated_once_while_unexported = False
                 time.sleep(0.5)
         except KeyboardInterrupt:
-            self.logger.debug("received keyboard interrupt")
+            self.logger.debug("Received keyboard interrupt")
             if self.has_unexported_passwords and not terminated_once_while_unexported:
                 self.logger.warning(
                     f"Are you sure you want to exit? There are unexported passwords.\n"

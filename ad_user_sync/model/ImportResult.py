@@ -76,4 +76,4 @@ class ImportResult(BaseModel):
 
     def log_required_interactions(self, logger: Logger):
         for action in self.required_interactions:
-            logger.info(f"action required: {action.model_dump()}")
+            logger.info(f"Action required: {action.model_dump()}")
