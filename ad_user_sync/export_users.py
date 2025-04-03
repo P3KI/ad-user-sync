@@ -26,7 +26,7 @@ def export_users(config: ExportConfig, logger: Logger):
     make_relative_group_path = partial(sub_path, config.group_path)
     # make_relative_user_path  = partial(sub_path,  config.user_path)
     make_absolute_group_path = partial(full_path, config.group_path)
-    make_absolute_user_path = partial(full_path, config.user_path)
+    # make_absolute_user_path = partial(full_path, config.user_path)
 
     query_groups = set(map(make_absolute_group_path, config.search_groups))
 

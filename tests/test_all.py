@@ -39,8 +39,6 @@ def test_run(test):
     with open(importConfig) as f:
         config = json.load(f)
 
-    ret = True
-
     try:
         for stage in stages:
             if stage is not None:
@@ -114,7 +112,7 @@ def compare_users(expected, actual, now, expected_expiry):
                 )
 
 
-def sort_lists(l):
+def sort_lists(l):  # noqa: E741
     return l.sort(key=lambda x: x["sAMAccountName"])
 
 

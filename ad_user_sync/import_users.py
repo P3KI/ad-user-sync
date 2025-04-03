@@ -33,7 +33,7 @@ def import_users(
         p = full_path(config.group_path, g)
         logger.debug(f"loading ad group {p}...")
         group = active_directory.get_group(p)
-        logger.debug(f"...ad group loaded.")
+        logger.debug("...ad group loaded.")
         return group
 
     # resolve the config GroupMap form AD
@@ -73,7 +73,7 @@ def import_users(
         cn: str = config.prefix_common_names + user_attributes.pop("cn")  # used as key and for user creation
         account_name: str = user_attributes.pop("sAMAccountName")  # used for user creation
         member_of: List[str] = user_attributes.pop("memberOf")  # will be mapped to "member" attribute of groups
-        account_expires: str | None = user_attributes.pop("accountExpires", None)  # set via ADUser.set_expiration()
+        _account_expires: str | None = user_attributes.pop("accountExpires", None)  # set via ADUser.set_expiration()
         disable: bool = user_attributes.pop("disabled", False)  # We only disable via ADUser.disable(), never enable
         user_attributes.pop("subPath", None)  # Currently not used, not a valid AD attribute.
         user_attributes.pop("distinguishedName", None)  # domain specific, should not be exported in the first place
@@ -82,7 +82,7 @@ def import_users(
 
         # Retrieve existing user, if present
         name_resolution = resolutions.get_name(cn, account_name)
-        logger.debug(f"look for existing user...")
+        logger.debug("look for existing user...")
         # If the user selected to resolve a name conflict by taking over the existing account, we need to search for that
         if (name_resolution is not None) and name_resolution.is_accepted and name_resolution.take_over_account:
             logger.debug(f"name_resolution says take over account {account_name}")
@@ -239,7 +239,7 @@ def import_users(
                     result.add_joined(user, group)
                     logger.info(f'{user.cn}: Joined group "{group.cn}"')
             else:
-                logger.debug(f"no joining users for group.")
+                logger.debug("no joining users for group.")
         else:
             # joining a restricted group requires a resolved interactive action
             join_candidates = current_group_members - old_members
@@ -374,7 +374,7 @@ def create_user(
                 previous_error = None
             else:
                 # edge case:
-                logger.debug(f"check if original name is free in the meantime...")
+                logger.debug("check if original name is free in the meantime...")
                 old_name_conflict_user = active_directory.find_single_user(
                     parent=user_container.get_domain(),
                     where=f"sAMAccountName = '{account_name}'",
@@ -398,7 +398,7 @@ def create_user(
                         result=result,
                     )
 
-                logger.debug(f"no. that one is still taken.")
+                logger.debug("no. that one is still taken.")
                 previous_error = f"Account name {new_account_name} is already in use too ({conflict_user.cn})."
 
             if name_resolution is None or name_resolution.is_accepted:
@@ -416,7 +416,7 @@ def create_user(
             return None
 
         # it was another problem. re-raise exception
-        logger.debug(f"nope, also no account name conflict. no idea what the problem is. re-raise exception.")
+        logger.debug("nope, also no account name conflict. no idea what the problem is. re-raise exception.")
         raise
 
 
