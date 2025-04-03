@@ -97,6 +97,7 @@ if __name__ == "__main__":
         print(result.model_dump_json(indent=4))
     elif args.command == "export":
         config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+        config.hmac = args.hmac or config.hmac
 
         users = export_users(config=config, logger=Logger.get())
         if config.export_file:
