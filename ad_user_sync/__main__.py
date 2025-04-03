@@ -2,7 +2,7 @@
 import argparse
 import json
 import sys
-
+import importlib.metadata
 
 from ad_user_sync.util import document_model
 from ad_user_sync.interactive_import import interactive_import, InteractiveImportConfig, import_users
@@ -17,6 +17,11 @@ arg_parser = argparse.ArgumentParser(
     add_help=True,
     exit_on_error=True,
 )
+arg_parser.add_argument("--version",
+                        action='store_true',
+                        dest="version",
+                        help="Print version information and exit")
+
 subparsers = arg_parser.add_subparsers(dest="command", help="Available commands")
 
 import_arg_parser = subparsers.add_parser(
@@ -55,11 +60,20 @@ export_arg_parser.add_argument(
 
 export_arg_parser.add_argument("--hmac", dest="hmac", help="Add HMAC to output file using a shared key")
 
+def get_version():
+    try:
+        return importlib.metadata.version('ad-user-sync')
+    except importlib.metadata.PackageNotFoundError:
+        return "(unknown)"
+
 if __name__ == "__main__":
     args = arg_parser.parse_args()
     Logger.init(args.command)
 
-    if args.command == "import":
+    if args.version:
+        print(f"AD User Sync version: {get_version()}")
+
+    elif args.command == "import":
         if args.interactive:
             config = InteractiveImportConfig.load(
                 file=args.config_file,
@@ -70,6 +84,7 @@ if __name__ == "__main__":
             config.hmac = args.hmac or config.hmac
 
             Logger.set_config(config)
+            Logger.get().info(f"Starting AD User Sync version: {get_version()}")
             result = interactive_import(
                 config=config,
                 logger=Logger.get(),
@@ -79,6 +94,7 @@ if __name__ == "__main__":
             config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
             config.hmac = args.hmac or config.hmac
             Logger.set_config(config)
+            Logger.get().info(f"Starting AD User Sync version: {get_version()}")
             result = import_users(
                 config=config,
                 logger=Logger.get(),
