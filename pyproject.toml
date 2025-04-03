@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "ad-user-sync"
-version = "0.9.0"
+version = "1.0.0"
 description = "A tool to export users from a Windows Active Directory and import them into another."
 authors = ["Philipp Claves <philipp@p3ki.com>", "Felix Hofmann <felix.hofmann@fxhm.de>"]
 readme = "README.md"
