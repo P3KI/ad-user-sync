@@ -12,7 +12,7 @@ from ad_user_sync.user_file import UserFile
 from ad_user_sync.logger import Logger
 
 arg_parser = argparse.ArgumentParser(
-    prog="user-sync.exe",
+    prog="ad-user-sync.exe",
     description="Import/Export Windows ActiveDirectory user accounts",
     add_help=True,
     exit_on_error=True,

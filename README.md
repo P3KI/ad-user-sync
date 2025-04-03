@@ -6,18 +6,18 @@ the user must provide means to transfer this file from the exporting to the impo
 
 
 ## Exporting
-First create a config file. Run `user-sync.exe export --help` to see what parameters are supported.
+First create a config file. Run `ad-user-sync.exe export --help` to see what parameters are supported.
 
 ### Export Users to file
 To export users just run:
 ```
-user-sync.exe export
+ad-user-sync.exe export
 ```
 By default, the config is read from `export-config.json`, but a different filename can be specified with the 
 `--config CONFIG_FILE` option.
 
 ## Importing users ##
-First create a config file. Run `user-sync.exe import --help` to see what parameters are supported.
+First create a config file. Run `ad-user-sync.exe import --help` to see what parameters are supported.
 The Active Directory path specified using `managed_user_path` in the configuration must also be created manually before first use.
 
 Import mode creates new active directory users or updates the attributes of previously create ones to match the data found
@@ -29,7 +29,7 @@ Managed users that have been previously created are never deleted, but deactivat
 ### Importing Users from file 
 To import users just run:
 ```
-user-sync.exe import
+ad-user-sync.exe import
 ```
 By default, the config is read from `import-config.json`, but a different filename can be specified with the 
 `--config CONFIG_FILE` option.
@@ -44,7 +44,7 @@ The import process is not fully automatic. Some actions require manual approval.
 
 These cases can be resolved interactively with the `--interactive` flag:
 ```
-user-sync.exe import --interactive
+ad-user-sync.exe import --interactive
 ```
 
 A Browser window should open up and guide you through accepting or rejecting these actions.
@@ -69,14 +69,14 @@ The used level can be set through the `log_level` config parameter.
 A message authentication code can be added to the export output file. This is used to check for a corrupted file when importing.
 To add the HMAC specify the `--hmac SHARED_SECRET` option to the export command line:
 ```
-user-sync.exe export --hmac d8b1619ae68eec643255a74014233f6d
+ad-user-sync.exe export --hmac d8b1619ae68eec643255a74014233f6d
 ```
 This will add another line with the calculated to the message authentication code output.
 Because it is added as an extra line, the output will _no longer be JSON compliant_.
 
 If a `--hmac` option is specified during export, it *must* also be specified during import and *must* use the exact same shared secret.
 ```
-user-sync.exe import --hmac d8b1619ae68eec643255a74014233f6d
+ad-user-sync.exe import --hmac d8b1619ae68eec643255a74014233f6d
 ```
 
 ## Development
