@@ -124,7 +124,15 @@
     <div class="running-only">
         <span id="passwords-count">{{ password_count }}</span> new password(s) set
         <span id="passwords-unexported" class="warning"></span>
-        <a id="passwords-export" href="/export-passwords?tag={{ tag }}" class="hidden">export</a>
+        <form
+            id="passwords-export"
+            method="post"
+            target="_blank"
+            action="/export-passwords?tag={{ tag }}"
+        >
+            <input type="text" name="password" placeholder="encryption key" />
+            <input type="submit" value="Export passwords" />
+        </form>
     </div>
 
     {% if error %}
@@ -286,9 +294,8 @@
         {% endfor %}
     {% endif %}
     </div>
-
-    <script src="static/wordlist-5-dice-eff.js"></script>
     <script>
+        const wordlist = {{ wordlist }}
         const passwordWordCount = {{ password_word_count or 5 }}
         const passwordSuffix = '{{ password_suffix or "" }}'
 

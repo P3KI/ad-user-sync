@@ -3,15 +3,15 @@
     "managed_user_path": "CN=P3KI Managed,DC=l4,DC=dev,DC=p3ki,DC=com",
     "group_path": "CN=Users,DC=l4,DC=dev,DC=p3ki,DC=com",
     "group_map": {
-        "CN=t-Administrators" : ["CN=p-Administrators","CN=p-Operators"],
-        "CN=t-Operators"      : "CN=p-Operators",
-        "CN=t-Viewers"        : "CN=p-Viewers",
-        "*"                   : "CN=p-Managed"
+        "CN=t-Administrators": ["CN=p-Administrators","CN=p-Operators"],
+        "CN=t-Operators"     : "CN=p-Operators",
+        "CN=t-Viewers"       : "CN=p-Viewers",
+        "*"                  : "CN=p-Managed"
     },
     "restricted_groups": ["CN=p-Administrators"],
     "prefix_common_names": "P3KI ",
-    "users_can_not_change_password" : false,
-    "users_must_change_password" : false,
+    "users_can_not_change_password": false,
+    "users_must_change_password": false,
     "expiration_time": "P1M2D",
     "resolutions_file": "resolutions.json",
     "log_level": "DEBUG",

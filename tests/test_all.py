@@ -11,20 +11,21 @@ import dateutil.parser
 import pytest
 from dateutil.relativedelta import relativedelta
 
-from pyad import ADGroup, ADUser, win32Exception, ADContainer
+from pyad import ADUser, ADContainer
 
 
 basePath = pathlib.Path(__file__).parent
 testPath = basePath / "cases"
 
-syncScript     = (basePath / ".." / "user_sync.py").absolute()
-importConfig   = (basePath / "import_config.json").absolute()
+syncScript = (basePath / ".." / "user_sync.py").absolute()
+importConfig = (basePath / "import_config.json").absolute()
 readbackConfig = (basePath / "readback_config.json").absolute()
 
 tests = list(testPath.glob("*"))
 tests.sort()
 
 pytestmark = pytest.mark.parametrize("test", tests)
+
 
 def test_run(test):
     print("#### Running test {}".format(test))
@@ -47,16 +48,14 @@ def test_run(test):
                 os.chdir(stage)
 
             shutil.copy("ResolutionsIn.json", "Resolutions.json")
-            subprocess.run (["python", syncScript, "import", "--config", importConfig])
-            subprocess.run (["python", syncScript, "export", "--config", readbackConfig])
+            subprocess.run(["python", syncScript, "import", "--config", importConfig])
+            subprocess.run(["python", syncScript, "export", "--config", readbackConfig])
             os.remove("Resolutions.json")
-
 
             with open("Expected.json") as f:
                 expected_result = json.load(f)["users"]
             with open("Readback.json") as f:
                 actual_result = json.load(f)["users"]
-
 
             try:
                 compare_lists(expected_result, actual_result)
@@ -72,13 +71,16 @@ def compare_lists(expected, actual):
     sort_lists(actual)
 
     if len(expected) != len(actual):
-        raise AssertionError("Number of imported users differ from expected. Expected: {}\nActual: {}".format(len(expected), len(actual)))
+        raise AssertionError(
+            "Number of imported users differ from expected. Expected: {}\nActual: {}".format(len(expected), len(actual))
+        )
 
     now = datetime.now(timezone.utc)
-    expected_expiry = now + relativedelta(months=1,days=2)
+    expected_expiry = now + relativedelta(months=1, days=2)
 
     for i in range(len(expected)):
         compare_users(expected[i], actual[i], now, expected_expiry)
+
 
 def compare_users(expected, actual, now, expected_expiry):
     missing_keys = set(expected.keys()) - set(actual.keys())
@@ -95,22 +97,30 @@ def compare_users(expected, actual, now, expected_expiry):
             actual[key].sort()
 
         if key == "accountExpires":
-            actual_expiry = dateutil.parser.parse(actual[key]).replace(tzinfo = timezone.utc)
+            actual_expiry = dateutil.parser.parse(actual[key]).replace(tzinfo=timezone.utc)
             delta = abs((actual_expiry - expected_expiry).total_seconds())
             if delta > 600:
-                raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}' ({}) (delta: {}sec now: {})".format(actual["cn"], key, expected_expiry, actual_expiry, actual[key], delta, now))
+                raise AssertionError(
+                    "User '{}' property for '{}' differs: Expected: '{}' Actual: '{}' ({}) (delta: {}sec now: {})".format(
+                        actual["cn"], key, expected_expiry, actual_expiry, actual[key], delta, now
+                    )
+                )
         else:
             if expected[key] != actual[key]:
-                raise AssertionError("User '{}' property for '{}' differs: Expected: '{}' Actual: '{}'".format(actual["cn"], key, expected[key], actual[key]))
+                raise AssertionError(
+                    "User '{}' property for '{}' differs: Expected: '{}' Actual: '{}'".format(
+                        actual["cn"], key, expected[key], actual[key]
+                    )
+                )
 
 
 def sort_lists(l):
-    return l.sort(key=lambda x: x['sAMAccountName'])
+    return l.sort(key=lambda x: x["sAMAccountName"])
 
 
 def cleanup(config):
     managed_user_path = config["managed_user_path"]
     managed_user_container = ADContainer.from_dn(managed_user_path)
     for user in managed_user_container.get_children_iter(True, [ADUser]):
-        #print("Cleanup user {}".format(user))
+        # print("Cleanup user {}".format(user))
         user.delete()
