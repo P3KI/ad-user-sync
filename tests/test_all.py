@@ -17,7 +17,7 @@ from pyad import ADUser, ADContainer
 basePath = pathlib.Path(__file__).parent
 testPath = basePath / "cases"
 
-syncScript = (basePath / ".." / "user_sync.py").absolute()
+syncScript = (basePath / ".." / "ad_user_sync" / "__main__.py").absolute()
 importConfig = (basePath / "import_config.json").absolute()
 readbackConfig = (basePath / "readback_config.json").absolute()
 
