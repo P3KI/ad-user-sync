@@ -68,7 +68,10 @@ if __name__ == "__main__":
     if args.command == "import":
         if args.interactive:
             config = InteractiveImportConfig.load(
-                file=args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True
+                file=args.config_file,
+                logger=Logger.get(),
+                fallback_default=False,
+                exit_on_fail=True,
             )
             config.hmac = args.hmac or config.hmac
 

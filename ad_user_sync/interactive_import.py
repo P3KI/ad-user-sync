@@ -3,7 +3,6 @@ import os
 import sys
 import time
 import webbrowser
-from io import BytesIO
 
 import tempfile
 import pyminizip
@@ -72,12 +71,12 @@ def interactive_import(
         content = "\n".join(map(":".join, session.set_passwords)) + "\n"
         with tempfile.TemporaryDirectory() as temp_dir:
             text_file_path = Path(temp_dir) / f"{filename}.txt"
-            with open(text_file_path, "w")as f:
+            with open(text_file_path, "w") as f:
                 f.write(content)
             zip_file_path = Path(temp_dir) / f"{filename}.zip"
 
             pyminizip.compress(str(text_file_path), "", str(zip_file_path), bottle.request.forms["password"], 5)
-            with open(zip_file_path, "rb")as f:
+            with open(zip_file_path, "rb") as f:
                 zip_bytes = f.read()
 
         bottle.response.headers["Content-Type"] = "application/zip"
