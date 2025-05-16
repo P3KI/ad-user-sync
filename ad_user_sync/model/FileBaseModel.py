@@ -55,6 +55,18 @@ class FileBaseModel(BaseModel):
             instance.save(file)
         return instance
 
+
+    @classmethod
+    def deserialize[T](cls : Type[T], file_content : str) -> T|None:
+        if len(file_content.strip()) > 1:
+            try:
+                return cls.model_validate_json(file_content)
+            except ValidationError as e:
+                return None
+        else:
+            return None
+
+
     def save(self, file: str | Path) -> None:
         with open(file, "w") as out:
             out.write(self.model_dump_json(indent=4))

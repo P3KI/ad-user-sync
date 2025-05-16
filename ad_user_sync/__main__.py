@@ -10,6 +10,7 @@ from ad_user_sync.export_users import export_users
 from ad_user_sync.model import ImportConfig, ResolutionList, ExportConfig
 from ad_user_sync.user_file import UserFile
 from ad_user_sync.logger import Logger
+from ad_user_sync.embedded_config import EmbeddedConfig
 
 arg_parser = argparse.ArgumentParser(
     prog="ad-user-sync.exe",
@@ -70,17 +71,18 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
     Logger.init(args.command)
 
+    embedded_config = EmbeddedConfig(Logger.get())
+
     if args.version:
         print(f"AD User Sync version: {get_version()}")
 
     elif args.command == "import":
         if args.interactive:
-            config = InteractiveImportConfig.load(
-                file=args.config_file,
-                logger=Logger.get(),
-                fallback_default=False,
-                exit_on_fail=True,
-            )
+            if embedded_config.import_config is None or args.config_file is not None:
+                config = InteractiveImportConfig.load(file=args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+            else:
+                config = embedded_config.import_config
+
             config.hmac = args.hmac or config.hmac
 
             Logger.set_config(config)
@@ -91,7 +93,11 @@ if __name__ == "__main__":
             )
 
         else:
-            config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+            if embedded_config.import_config is None or args.config_file is not None:
+                config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+            else:
+                config = embedded_config.import_config
+
             config.hmac = args.hmac or config.hmac
             Logger.set_config(config)
             Logger.get().info(f"Starting AD User Sync version: {get_version()}")
@@ -109,7 +115,12 @@ if __name__ == "__main__":
         # write the result to stdout
         print(result.model_dump_json(indent=4))
     elif args.command == "export":
-        config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+        if embedded_config.export_config is None or args.config_file is not None:
+            config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+        else:
+            config = embedded_config.export_config
+
+
         config.hmac = args.hmac or config.hmac
 
         users = export_users(config=config, logger=Logger.get())
