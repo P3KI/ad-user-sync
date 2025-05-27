@@ -14,6 +14,8 @@ class EmbeddedConfig:
 
 
     def __init__(self, logger : Logger):
+        self.export_config = None
+        self.import_config = None
 
         if not getattr(sys, 'frozen', False):
             return None
@@ -24,11 +26,8 @@ class EmbeddedConfig:
             exec_buffer = f.read()
 
             export_config_buffer = self.get_section(exec_buffer, self.HEADER_EXPORT_START, self.HEADER_EXPORT_END)
-            import_config_buffer = self.get_section(exec_buffer, self.HEADER_IMPORT_START, self.HEADER_IMPORT_END)
+            import_config_buffer = self.get_section(exec_buffer, self.HEADER_IMPORT_START, self.HEADER_IMPORT_END
 
-
-            self.export_config = None
-            self.import_config = None
 
             if export_config_buffer is not None:
                 self.export_config = ExportConfig.deserialize(export_config_buffer)
