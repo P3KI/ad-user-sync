@@ -15,7 +15,7 @@ class Logger:
     @classmethod
     def init(cls, name):
         logger = logging.getLogger()
-        logger.setLevel(logging.ERROR)
+        logger.setLevel(logging.INFO)
 
         for handler in logger.handlers:
             logger.removeHandler(handler)
