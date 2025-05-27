@@ -28,7 +28,8 @@ class UserFile:
             f.write(body)
             if self.hmac:
                 if not body.endswith("\n"):
-                    body += "\n"
+                    f.write("\n")
+
                 mac = HMAC(bytes.fromhex(self.hmac), bytes(body, "utf-8"), hashlib.sha256)
                 f.write(mac.hexdigest())
 
