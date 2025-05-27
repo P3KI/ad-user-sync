@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
         users = export_users(config=config, logger=Logger.get())
         if config.export_file:
-            UserFile(path=config.export_file, hmac=args.hmac).write(users)
+            UserFile(path=config.export_file, hmac=config.hmac).write(users)
         else:
             print(json.dumps(users, ensure_ascii=False, indent=4))
 
