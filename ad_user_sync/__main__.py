@@ -34,7 +34,7 @@ import_arg_parser = subparsers.add_parser(
 import_arg_parser.add_argument(
     "--config",
     dest="config_file",
-    default="import_config.json",
+    default=None,
     help="Configuration file to use.",
 )
 import_arg_parser.add_argument(
@@ -55,7 +55,7 @@ export_arg_parser = subparsers.add_parser(
 export_arg_parser.add_argument(
     "--config",
     dest="config_file",
-    default="export_config.json",
+    default=None,
     help="Configuration file to use. See README.",
 )
 
@@ -77,10 +77,13 @@ if __name__ == "__main__":
         print(f"AD User Sync version: {get_version()}")
 
     elif args.command == "import":
+        config_file = args.config_file or "import_config.json"
         if args.interactive:
             if embedded_config.import_config is None or args.config_file is not None:
-                config = InteractiveImportConfig.load(file=args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+                Logger.get().info("Using config: %s", config_file)
+                config = InteractiveImportConfig.load(file=config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
             else:
+                Logger.get().info("Using embedded config")
                 config = embedded_config.import_config
 
             config.hmac = args.hmac or config.hmac
@@ -94,8 +97,10 @@ if __name__ == "__main__":
 
         else:
             if embedded_config.import_config is None or args.config_file is not None:
-                config = ImportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+                Logger.get().info("Using config: %s", config_file)
+                config = ImportConfig.load(config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
             else:
+                Logger.get().info("Using embedded config")
                 config = embedded_config.import_config
 
             config.hmac = args.hmac or config.hmac
@@ -115,9 +120,12 @@ if __name__ == "__main__":
         # write the result to stdout
         print(result.model_dump_json(indent=4))
     elif args.command == "export":
+        config_file = args.config_file or "export_config.json"
         if embedded_config.export_config is None or args.config_file is not None:
-            config = ExportConfig.load(args.config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
+            Logger.get().info("Using config: %s", config_file)
+            config = ExportConfig.load(config_file, logger=Logger.get(), fallback_default=False, exit_on_fail=True)
         else:
+            Logger.get().info("Using embedded config")
             config = embedded_config.export_config
 
 

@@ -26,7 +26,7 @@ class EmbeddedConfig:
             exec_buffer = f.read()
 
             export_config_buffer = self.get_section(exec_buffer, self.HEADER_EXPORT_START, self.HEADER_EXPORT_END)
-            import_config_buffer = self.get_section(exec_buffer, self.HEADER_IMPORT_START, self.HEADER_IMPORT_END
+            import_config_buffer = self.get_section(exec_buffer, self.HEADER_IMPORT_START, self.HEADER_IMPORT_END)
 
 
             if export_config_buffer is not None:
