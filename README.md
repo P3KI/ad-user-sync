@@ -96,3 +96,15 @@ To build the executable run:
 poetry build
 ```
 
+
+## License
+
+UserSync is dual-licensed:
+
+- **Noncommercial License** (default):  
+  You may use, copy, and modify this software **only for noncommercial purposes** under the terms of the [AGPL v3](LICENSE.non-commercial.md).
+  Explicitly granted is the permission of running this software, as-is, in corporate settings where the software or the service of running it is not itself commercialized.
+
+- **Commercial License**:  
+  If you would like to use this software in a **commercial product, service, or for-profit environment**, you must obtain a commercial license from [P3KI GmbH](https://p3ki.com).
+
