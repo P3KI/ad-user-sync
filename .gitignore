@@ -4,3 +4,4 @@ resolutions.json
 dist
 build
 *.spec
+*.pyc
