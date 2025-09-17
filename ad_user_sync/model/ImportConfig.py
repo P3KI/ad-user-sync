@@ -2,9 +2,9 @@ from datetime import timedelta
 from enum import StrEnum
 from pathlib import Path
 from textwrap import dedent
-from typing import Annotated, Dict, List
+from typing import Annotated, Dict, List, Self
 
-from pydantic import Field, BeforeValidator
+from pydantic import Field, BeforeValidator, BaseModel, model_validator, field_serializer
 
 from .FileBaseModel import FileBaseModel
 from ..util import ensure_list_values
@@ -17,6 +17,81 @@ class LogLevel(StrEnum):
     WARNING = "WARNING"
     INFO = "INFO"
     DEBUG = "DEBUG"
+
+
+class VirtualImportGroup(BaseModel):
+    name: Annotated[
+        str,
+        Field(
+            title="Group Name",
+            description=dedent("""
+                Name of a virtual group. If a users is - according to the imported JSON - member
+                of this group, a virtual import is created for a derived account with the given
+                `prefix` for this group and for the original or base user instead an import for
+                the `altgroup`. The `altgroup` is a *source* group like it would appear in the
+                JSON file; not a local group.
+
+                When no `altgroup` is given and the account is not member of another relevant group, the
+                base user will not be imported.
+
+                Example use case is to create a separate admin-account for a user and place the standard
+                account into the operators group.
+            """),
+            examples=["CN=p-Administrators"],
+        ),
+    ]
+
+    prefix: Annotated[
+        str,
+        Field(
+            title="User Name Prefix",
+            default="",
+            description=dedent("""
+                Prefix to add to the virtual imported user mapping that will be used for the virtual import,
+                for example, `adm`.
+            """),
+            examples=["adm"],
+        ),
+    ]
+
+    suffix: Annotated[
+        str,
+        Field(
+            title="User Name Suffix",
+            default="",
+            description=dedent("""
+                Suffix to add to the virtual imported user mapping that will be used for the virtual import,
+                for example, `adm`.
+            """),
+            examples=["adm"],
+        ),
+    ]
+
+    altgroup: Annotated[
+        str,
+        Field(
+            title="Alternate Group",
+            default=None,
+            description=dedent("""
+                Assign the original user to this alternate *source* group in addition to the original group,
+                which will be assigned to the prefixed user.
+                When no altgroup is specified, the original users will not be added to any group.
+            """),
+            examples=["CN=Operators"],
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def check_prefix_or_suffix(self) -> Self:
+        if not (self.suffix or self.prefix):
+            raise ValueError(f"Virtual Imports need at least one of prefix or suffix `{self.name}`")
+        return self
+
+    @model_validator(mode="after")
+    def check_map_to_self(self) -> Self:
+        if self.name == self.altgroup:
+            raise ValueError(f"Virtual Imports must not map to self `{self.name}` -> `{self.altgroup}`")
+        return self
 
 
 class ImportConfig(FileBaseModel):
@@ -94,6 +169,18 @@ class ImportConfig(FileBaseModel):
         ),
     ]
 
+    virtual_imports: Annotated[
+        List[VirtualImportGroup],
+        Field(
+            default_factory=dict,
+            title="Restricted Groups Mapping",
+            description=dedent("""
+                For these groups, the user gets separate account with a prefix to the user name for the
+                restricted group and the unprefixed user is assigned the alternative group.
+            """),
+        ),
+    ]
+
     prefix_common_names: Annotated[
         str,
         Field(
@@ -119,6 +206,34 @@ class ImportConfig(FileBaseModel):
             """),
             examples=["P1M1D"],
             gt=timedelta(days=1),
+        ),
+    ]
+
+    expiration_hour: Annotated[
+        int,
+        Field(
+            default=23,
+            title="Expiration time, hour",
+            description=dedent("""
+                Wall clock hour [0..23] when expiration will become effective. Uses timezone of directory controller!
+            """),
+            examples=["23", "12", "9"],
+            gt=0,
+            lt=23,
+        ),
+    ]
+
+    expiration_minute: Annotated[
+        int,
+        Field(
+            default=59,
+            title="Expiration time, minute",
+            description=dedent("""
+                Wall clock minute [0..59] when expiration will become effective.
+            """),
+            examples=["0", "5", "15", "59"],
+            gt=0,
+            lt=59,
         ),
     ]
 
@@ -228,6 +343,23 @@ class ImportConfig(FileBaseModel):
             examples=[10],
         ),
     ]
+
+    @field_serializer("expiration_time")
+    def serialize_expiration_time(self, expiration_time: str, _info):
+        return expiration_time
+
+    @model_validator(mode="after")
+    def check_virtual_imports(self) -> Self:
+        if self.virtual_imports:
+            alt_groups = {i.altgroup for i in self.virtual_imports if i.altgroup}
+            for i in self.virtual_imports:
+                if i.name in alt_groups:
+                    raise ValueError(f"Virtual imports must not cascade: `{i.name}` -> {i.altgroup}")
+            for i in alt_groups:
+                if i not in self.group_map:
+                    raise ValueError(f"Virtual import altgroup `{i}` does not map to any mapped (lhs) group!")
+        return self
+
 
 class InteractiveImportConfig(ImportConfig):
     port: Annotated[

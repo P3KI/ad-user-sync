@@ -1,6 +1,7 @@
 from datetime import datetime
 from logging import Logger
 from typing import Dict, List, Any, Set
+from copy import copy
 
 from pywintypes import com_error
 from pyad import ADGroup, ADUser, win32Exception, ADContainer
@@ -32,7 +33,11 @@ def import_users(
     def get_group(g: str) -> ADGroup:
         p = full_path(config.group_path, g)
         logger.debug(f"Loading ad group {p}...")
-        group = active_directory.get_group(p)
+        try:
+            group = active_directory.get_group(p)
+        except:
+            logger.error("Cannot load group")
+            raise ValueError(f"Cannot load group {p} - check config or create group before continuing.")
         logger.debug("...AD group loaded.")
         return group
 
@@ -50,13 +55,85 @@ def import_users(
 
     # The path where all managed users will be created. Defined by ManagedUserPath
     logger.debug("Loading ad container for managed_user_path...")
-    user_container = active_directory.get_container(config.managed_user_path)
+    user_container = active_directory.get_container(config.managed_user_path, logger)
     logger.debug("managed_user_path container loaded.")
 
     # Read users form input file
     logger.debug(f"Reading users file from {config.input_file}")
-    users_attributes = UserFile(path=config.input_file, hmac=config.hmac).read()
+    users_attributes, ts = UserFile(path=config.input_file, hmac=config.hmac).read()
+
     logger.debug(f"Users file loaded: {len(users_attributes)} user(s)")
+
+    # create virtual imports
+    virtual_imports_map = dict()
+    virtual_import_groups = {i.name: i for i in config.virtual_imports}
+    for user_attributes in users_attributes:
+        account_name = user_attributes["sAMAccountName"]
+        logger.debug(f"Processing {account_name}")
+        user_virtual_groups: List[str] = list(filter(lambda g: g in virtual_import_groups, user_attributes["memberOf"]))
+        if user_virtual_groups:
+            user_attributes["memberOf"] = list(
+                filter(lambda g: g not in virtual_import_groups, user_attributes["memberOf"])
+            )
+            user = active_directory.find_single_user(user_container.get_domain(), f"sAMAccountName = '{account_name}'")
+            logger.debug(f"User {account_name} in virtual import groups {user_virtual_groups}")
+            logger.debug(f"User {account_name} exists? {user != None}")
+            for virtual_group in user_virtual_groups:
+                alt_group = virtual_import_groups[virtual_group].altgroup
+                if alt_group:
+                    logger.debug(f"Adding alt group {alt_group} virtual import for {account_name}.")
+                    user_attributes["memberOf"].append(alt_group)
+
+            logger.debug(f"User {account_name} remaining groups {user_attributes['memberOf']}")
+
+            if user:
+                if user.parent_container != user_container:
+                    logger.debug("Conflicting account found, try to find resolved conflict")
+                    user = active_directory.find_single_user(
+                        user_container, f"cn = '{config.prefix_common_names + user_attributes['cn']}'"
+                    )
+                    if user and user.parent_container != user_container:
+                        logger.error("Resolves to {user.sAMAccountName} but not in managed path. Skip virtual import")
+                        continue
+                    elif not user:
+                        logger.debug("Base account does not yet exist,  postpone virtual import")
+                        continue
+                    else:
+                        logger.debug("Base account exists and is managed. Continue with virtual import")
+                        account_name = user.sAMAccountName
+                else:
+                    logger.debug("Base account exists and is managed. Continue with virtual import")
+            else:
+                if user_attributes["memberOf"]:
+                    logger.debug(f"Extra account(s) for {account_name} set to wait for base account creation.")
+                    continue
+                else:
+                    logger.debug(
+                        "Base account does not yet exist, but no groups remain for base - continue with virtual import"
+                    )
+
+            for virtual_group in user_virtual_groups:
+                cn: str = (
+                    virtual_import_groups[virtual_group].prefix
+                    + user_attributes["cn"]
+                    + virtual_import_groups[virtual_group].suffix
+                )  # ?
+                account_name: str = (
+                    virtual_import_groups[virtual_group].prefix
+                    + account_name
+                    + virtual_import_groups[virtual_group].suffix
+                )
+                logger.debug(f"Adding virtual import for {account_name} to group {virtual_group}.")
+                virtual_user_attributes = virtual_imports_map.get(account_name)
+                if not virtual_user_attributes:
+                    virtual_user_attributes = copy(user_attributes)  # shallow copy
+                    virtual_user_attributes["memberOf"] = []
+                    virtual_user_attributes["sAMAccountName"] = account_name
+                    virtual_user_attributes["cn"] = cn
+                    virtual_imports_map[account_name] = virtual_user_attributes
+                virtual_user_attributes["memberOf"].append(virtual_group)
+    users_attributes = list(filter(lambda i: i["memberOf"], users_attributes))
+    users_attributes.extend(virtual_imports_map.values())
 
     # All users imported during this run
     current_users: Set[ADUser] = set()  # list of users that are present in the current import list
@@ -64,8 +141,14 @@ def import_users(
     # User memberships for all managed groups are collected here
     current_members_by_group: Dict[ADGroup, Set[ADUser]] = {k: set() for k in set().union(*group_map.values())}
 
-    # expiration date to be set to enabled users
-    user_expiration_date = datetime.now() + config.expiration_time
+    # expiration date to be set to enabled users based on export time (if before now)
+    now = datetime.now()
+    if ts > now:
+        logger.warn(f"Users file is from the future: {ts} > {now} (now) - use current time for expiration calculation")
+    expiry = min(now, ts)
+    expiry = expiry.replace(hour=config.expiration_hour, minute=config.expiration_minute, second=0, microsecond=0)
+    user_expiration_date = expiry + config.expiration_time
+    logger.debug(f"Target expiration: {user_expiration_date}")
 
     logger.debug(f"==== Syncing {len(users_attributes)} user(s) ====")
     for user_attributes in users_attributes:

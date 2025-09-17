@@ -3,7 +3,7 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Tuple
 
 
 class UserFile:
@@ -33,7 +33,7 @@ class UserFile:
                 mac = HMAC(bytes.fromhex(self.hmac), bytes(body, "utf-8"), hashlib.sha256)
                 f.write(mac.hexdigest())
 
-    def read(self) -> List[Dict[str, Any]]:
+    def read(self) -> Tuple[List[Dict[str, Any]], datetime]:
         with open(self.path) as f:
             body = f.read()
 
@@ -45,4 +45,4 @@ class UserFile:
                 raise ValueError("MAC verification failed")
 
         root = json.loads(body)
-        return root["users"]
+        return (root["users"], datetime.fromisoformat(root["timestamp"]))
