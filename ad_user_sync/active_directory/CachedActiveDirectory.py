@@ -1,5 +1,5 @@
 from functools import lru_cache
-from logging import Logger
+from logging import Logger, getLogger
 from typing import List, Dict, Any, Iterable, Set
 
 from pyad import ADContainer, ADGroup, ADQuery, ADUser
@@ -64,5 +64,19 @@ class CachedActiveDirectory:
         return ADGroup.from_dn(dn)
 
     @lru_cache(maxsize=None)
-    def get_container(self, dn: str) -> ADContainer:
-        return ADContainer.from_dn(dn)
+    def get_container(self, dn: str, logger: Logger | None = None) -> ADContainer:
+        try:
+            return ADContainer.from_dn(dn)
+        except:
+            if not logger:
+                logger: Logger = getLogger(__name__)
+            logger.debug(f"Container `{dn}` not found")
+            idx: int = dn.find(",")
+            if idx < 0:
+                logger.error(f"Cannot locate parent in dn {dn}")
+                raise ValueError(f"User path {dn} not found")
+            cn: str = dn[3:idx]
+            # cannot create ou in "Users" via pyad - Powershell does the job
+            raise ValueError(
+                f'Please run following Powershell:\nNew-ADObject -Name "{cn}" -Type container -Path "{dn}"'
+            )
