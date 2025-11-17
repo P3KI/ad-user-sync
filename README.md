@@ -83,18 +83,24 @@ ad-user-sync.exe import --hmac d8b1619ae68eec643255a74014233f6d
 Make sure you got [python >=3.13](https://www.python.org/downloads/) and [poetry](https://python-poetry.org/docs/)
 installed on your system.
 
-Install the dependencies to a new virtual environment and activate it run: 
+Install the dependencies to a new virtual environment and activate it:
 ```
 poetry install
 poetry shell
 ```
 
-Then execute the `user_sync.py` with arguments like described above.
+Poetry will run a PowerShell (PS1) script to activate the environment. You may need to allow executing them:
+
+    Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser
+
+Then execute the `ad-user-sync` with arguments like described above.
 
 To build the executable run:
 ```
 poetry build
 ```
+
+The result will be `.\dist\pyinstaller\win_amd64\ad-user-sync.exe`
 
 
 ## License
